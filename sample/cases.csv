@@ -1,0 +1,6 @@
+category,customerQuestion,standardReply,keywords
+Order & Shipping,Where is my order?,Thank you for your message. Your order is currently being processed and will be shipped soon.,"order,shipping,delivery"
+Refunds & Returns,I want a refund,We are sorry to hear that. Please send us your order number and we will help you with the refund process.,"refund,return,cancel"
+Product Issue,My item arrived damaged,We are sorry that your item arrived damaged. Please send us a photo and your order number so we can assist you further.,"damaged,broken,not working"
+Account & Access,I cannot log into my account,Please try resetting your password first. If the issue continues, contact us and we will help restore access.,"login,password,account"
+Billing,Why was I charged twice?,We are sorry for the confusion. Please share your order number and payment screenshot so we can check the duplicate charge.,"billing,charged,payment"
