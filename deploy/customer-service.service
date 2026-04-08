@@ -7,6 +7,9 @@ User=portal-system
 Group=portal-system
 WorkingDirectory=/opt/customer-service
 Environment=NODE_ENV=production
+Environment=PORTAL_SYSTEM_ROOT=/opt/portal-system
+Environment=PORTAL_DATA_ROOT=/opt/portal-system/data_lake
+Environment=PYTHON_BIN=/opt/portal-system/venv/bin/python3
 ExecStart=/usr/bin/npm run start -- --hostname 127.0.0.1 --port 3001
 Restart=always
 RestartSec=5

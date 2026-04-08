@@ -1,14 +1,15 @@
 import { NextResponse } from 'next/server'
 import fs from 'fs'
-import path from 'path'
 import { execFile } from 'child_process'
 import { promisify } from 'util'
+import { getPortalSystemRoot, getPythonBin, portalPath } from '@/lib/sharedPortal'
 
 const execFileAsync = promisify(execFile)
 
-const REPO_ROOT       = path.join(process.cwd(), '..', '..')
-const BUILD_VIEW      = path.join(REPO_ROOT, 'services', 'sku-mapping', 'build_pending_view.py')
-const PENDING_VIEW    = path.join(REPO_ROOT, 'services', 'sku-mapping', 'pending', 'pending_view.json')
+const PORTAL_ROOT = getPortalSystemRoot()
+const PYTHON_BIN = getPythonBin()
+const BUILD_VIEW = portalPath('services', 'sku-mapping', 'build_pending_view.py')
+const PENDING_VIEW = portalPath('services', 'sku-mapping', 'pending', 'pending_view.json')
 
 export interface PendingEntry {
   original_sku: string
@@ -22,7 +23,7 @@ export interface PendingEntry {
 export async function GET() {
   // Rebuild view from pending.json before returning — cheap and ensures freshness.
   try {
-    await execFileAsync('python', [BUILD_VIEW], { cwd: REPO_ROOT })
+    await execFileAsync(PYTHON_BIN, [BUILD_VIEW], { cwd: PORTAL_ROOT })
   } catch {
     // Non-fatal: fall through to return whatever is on disk.
   }

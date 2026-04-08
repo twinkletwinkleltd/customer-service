@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server"
 import fs from "fs"
-import path from "path"
-import { exec } from "child_process"
+import { execFile } from "child_process"
 import { promisify } from "util"
+import { getPortalSystemRoot, getPythonBin, portalDataPath, portalPath } from "@/lib/sharedPortal"
 
 // NOTE: Transition state.
 // This route is now a manual rebuild trigger for the shared inventory view.
@@ -15,17 +15,12 @@ import { promisify } from "util"
 //
 // True future import flow will come from processed dataset generation, not from this endpoint.
 
-const execAsync = promisify(exec)
+const execFileAsync = promisify(execFile)
 
-const REPO_ROOT = path.join(process.cwd(), "..", "..")
-const BUILDER_SCRIPT = path.join("services", "inventory", "build_inventory_view.py")
-const SHARED_VIEW_PATH = path.join(
-  REPO_ROOT,
-  "data",
-  "processed",
-  "inventory",
-  "inventory_view.json"
-)
+const PORTAL_ROOT = getPortalSystemRoot()
+const PYTHON_BIN = getPythonBin()
+const BUILDER_SCRIPT = portalPath("services", "inventory", "build_inventory_view.py")
+const SHARED_VIEW_PATH = portalDataPath("processed", "inventory", "inventory_view.json")
 
 const FAILURE_RESPONSE = {
   success: false,
@@ -45,14 +40,15 @@ export async function POST(req: Request) {
 
   // Trigger shared inventory view rebuild.
   let stdout = ""
-  let stderr = ""
 
   try {
-    const result = await execAsync(`python ${BUILDER_SCRIPT}`, { cwd: REPO_ROOT })
+    const result = await execFileAsync(PYTHON_BIN, [BUILDER_SCRIPT], { cwd: PORTAL_ROOT })
     stdout = result.stdout
-    stderr = result.stderr
-  } catch (err: any) {
-    const errorOutput = err.stderr || err.message || "unknown error"
+  } catch (err: unknown) {
+    const errorOutput =
+      err && typeof err === "object" && "stderr" in err
+        ? String((err as { stderr?: string }).stderr || (err as { message?: string }).message || "unknown error")
+        : "unknown error"
     return NextResponse.json({
       ...FAILURE_RESPONSE,
       message: `Inventory view rebuild failed: ${errorOutput.trim()}`,

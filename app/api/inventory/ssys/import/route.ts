@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
 import fs from 'fs'
-import path from 'path'
-import { exec } from 'child_process'
+import { execFile } from 'child_process'
 import { promisify } from 'util'
+import { getPortalSystemRoot, getPythonBin, portalPath } from '@/lib/sharedPortal'
 
 export interface SSYSImportResult {
   success: boolean
@@ -15,11 +15,12 @@ export interface SSYSImportResult {
   message: string
 }
 
-const execAsync = promisify(exec)
+const execFileAsync = promisify(execFile)
 
-const REPO_ROOT = path.join(process.cwd(), '..', '..')
-const RUN_IMPORT = path.join('modules', 'ssys-cleaner', 'run_import.py')
-const UPLOADS_DIR = path.join(REPO_ROOT, 'modules', 'ssys-cleaner', 'uploads')
+const PORTAL_ROOT = getPortalSystemRoot()
+const PYTHON_BIN = getPythonBin()
+const RUN_IMPORT = portalPath('modules', 'ssys-cleaner', 'run_import.py')
+const UPLOADS_DIR = portalPath('modules', 'ssys-cleaner', 'uploads')
 
 const FAILURE_RESULT: SSYSImportResult = {
   success: false,
@@ -59,7 +60,6 @@ function parseRunImportOutput(stdout: string): SSYSImportResult {
 
 export async function POST(request: Request) {
   let fileBuffer: Buffer
-  let savedPath: string
 
   try {
     const formData = await request.formData()
@@ -87,7 +87,7 @@ export async function POST(request: Request) {
 
   // Save file for traceability
   const ts = new Date().toISOString().replace(/-/g, '').replace(/:/g, '').slice(0, 15) + 'Z'
-  savedPath = path.join(UPLOADS_DIR, `ssys_upload_${ts}.csv`)
+  const savedPath = portalPath('modules', 'ssys-cleaner', 'uploads', `ssys_upload_${ts}.csv`)
 
   try {
     fs.mkdirSync(UPLOADS_DIR, { recursive: true })
@@ -102,12 +102,18 @@ export async function POST(request: Request) {
   // Invoke run_import.py
   let stdout = ''
   try {
-    const result = await execAsync(`python "${RUN_IMPORT}" "${savedPath}"`, { cwd: REPO_ROOT })
+    const result = await execFileAsync(PYTHON_BIN, [RUN_IMPORT, savedPath], { cwd: PORTAL_ROOT })
     stdout = result.stdout
-  } catch (err: any) {
-    stdout = err.stdout || ''
+  } catch (err: unknown) {
+    stdout =
+      err && typeof err === 'object' && 'stdout' in err
+        ? String((err as { stdout?: string }).stdout || '')
+        : ''
     if (!stdout) {
-      const errorMsg = (err.stderr || err.message || 'unknown error').trim()
+      const errorMsg =
+        err && typeof err === 'object'
+          ? String((err as { stderr?: string }).stderr || (err as { message?: string }).message || 'unknown error').trim()
+          : 'unknown error'
       return NextResponse.json({ ...FAILURE_RESULT, message: `Import process failed: ${errorMsg}` })
     }
   }

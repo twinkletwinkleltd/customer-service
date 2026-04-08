@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server'
-import path from 'path'
 import { execFile } from 'child_process'
 import { promisify } from 'util'
+import { getPortalSystemRoot, getPythonBin, portalPath } from '@/lib/sharedPortal'
 
 const execFileAsync = promisify(execFile)
 
-const REPO_ROOT     = path.join(process.cwd(), '..', '..')
-const APPLY_MAPPING = path.join(REPO_ROOT, 'services', 'sku-mapping', 'apply_mapping.py')
+const PORTAL_ROOT = getPortalSystemRoot()
+const PYTHON_BIN = getPythonBin()
+const APPLY_MAPPING = portalPath('services', 'sku-mapping', 'apply_mapping.py')
 
 interface ConfirmBody {
   original_sku: string
@@ -44,9 +45,9 @@ export async function POST(request: Request) {
   let stdout = ''
   try {
     const result = await execFileAsync(
-      'python',
+      PYTHON_BIN,
       [APPLY_MAPPING, '--sku', original_sku, '--source', source, '--standard-sku', standard_sku],
-      { cwd: REPO_ROOT }
+      { cwd: PORTAL_ROOT }
     )
     stdout = result.stdout
   } catch (err: any) {
