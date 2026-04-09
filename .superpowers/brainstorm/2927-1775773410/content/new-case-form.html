@@ -1,0 +1,135 @@
+<h2>New Case 表单布局</h2>
+<p class="subtitle">目前是 A-B-C-D 四段全部竖排滚动，三种改法如下</p>
+
+<div class="cards">
+
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;font-family:sans-serif;font-size:11px;height:190px;">
+        <!-- Step bar -->
+        <div style="background:white;border-bottom:1px solid #e2e8f0;padding:10px 16px;display:flex;align-items:center;gap:0;">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <div style="width:20px;height:20px;border-radius:50%;background:#3b82f6;color:white;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;">1</div>
+            <span style="color:#3b82f6;font-size:10px;font-weight:600;">客户信息</span>
+          </div>
+          <div style="flex:1;height:1px;background:#e2e8f0;margin:0 8px;"></div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <div style="width:20px;height:20px;border-radius:50%;background:#e2e8f0;color:#94a3b8;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;">2</div>
+            <span style="color:#94a3b8;font-size:10px;">对话</span>
+          </div>
+          <div style="flex:1;height:1px;background:#e2e8f0;margin:0 8px;"></div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <div style="width:20px;height:20px;border-radius:50%;background:#e2e8f0;color:#94a3b8;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;">3</div>
+            <span style="color:#94a3b8;font-size:10px;">结案信息</span>
+          </div>
+        </div>
+        <!-- Current step content -->
+        <div style="padding:14px 16px;">
+          <div style="background:white;border-radius:8px;border:1px solid #e2e8f0;padding:12px;">
+            <div style="color:#1e293b;font-weight:600;font-size:11px;margin-bottom:10px;">客户信息</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+              <div>
+                <div style="color:#94a3b8;font-size:9px;margin-bottom:2px;">姓名 *</div>
+                <div style="border:1px solid #e2e8f0;border-radius:4px;padding:5px 8px;color:#94a3b8;font-size:10px;">输入姓名…</div>
+              </div>
+              <div>
+                <div style="color:#94a3b8;font-size:9px;margin-bottom:2px;">Order ID *</div>
+                <div style="border:1px solid #e2e8f0;border-radius:4px;padding:5px 8px;color:#94a3b8;font-size:10px;">输入订单号…</div>
+              </div>
+            </div>
+            <div style="display:flex;justify-content:flex-end;margin-top:10px;">
+              <div style="background:#3b82f6;color:white;border-radius:6px;padding:5px 14px;font-size:10px;font-weight:600;">下一步 →</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A — 步骤向导（3步）</h3>
+      <p>拆成 3 步：① 客户信息+SKU → ② 对话录入 → ③ 问题摘要+分类+解决方案。每步独立，顶部进度条，不再需要滚动</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;font-family:sans-serif;font-size:11px;height:190px;display:flex;flex-direction:column;">
+        <div style="background:white;border-bottom:1px solid #e2e8f0;padding:8px 14px;color:#1e293b;font-weight:600;">New Case</div>
+        <div style="display:flex;flex:1;overflow:hidden;">
+          <!-- Left: form -->
+          <div style="width:55%;border-right:1px solid #e2e8f0;padding:12px;display:flex;flex-direction:column;gap:6px;overflow:hidden;">
+            <div>
+              <div style="color:#94a3b8;font-size:9px;margin-bottom:2px;">姓名 *</div>
+              <div style="border:1px solid #e2e8f0;border-radius:4px;padding:4px 7px;font-size:10px;color:#94a3b8;">…</div>
+            </div>
+            <div>
+              <div style="color:#94a3b8;font-size:9px;margin-bottom:2px;">SKU *</div>
+              <div style="border:1px solid #e2e8f0;border-radius:4px;padding:4px 7px;font-size:10px;color:#94a3b8;">…</div>
+            </div>
+            <div>
+              <div style="color:#94a3b8;font-size:9px;margin-bottom:2px;">Issue *</div>
+              <div style="border:1px solid #e2e8f0;border-radius:4px;padding:4px 7px;font-size:10px;color:#94a3b8;">…</div>
+            </div>
+            <div style="display:flex;gap:4px;margin-top:auto;">
+              <div style="background:#3b82f6;color:white;border-radius:5px;padding:4px 10px;font-size:9px;font-weight:600;">Save</div>
+              <div style="border:1px solid #e2e8f0;color:#64748b;border-radius:5px;padding:4px 10px;font-size:9px;">Cancel</div>
+            </div>
+          </div>
+          <!-- Right: chat -->
+          <div style="flex:1;padding:10px;display:flex;flex-direction:column;gap:4px;">
+            <div style="color:#94a3b8;font-size:9px;font-weight:600;margin-bottom:4px;">对话记录</div>
+            <div style="background:white;border:1px solid #e2e8f0;border-radius:6px;padding:5px 8px;font-size:9px;color:#374151;">Hi, my package arrived damaged</div>
+            <div style="background:#3b82f6;color:white;border-radius:6px;padding:5px 8px;font-size:9px;align-self:flex-end;max-width:80%;">Sorry to hear that, please send a photo…</div>
+            <div style="margin-top:auto;border-top:1px solid #e2e8f0;padding-top:6px;display:flex;gap:3px;">
+              <div style="border:1px solid #e2e8f0;border-radius:4px;padding:3px 6px;font-size:8px;color:#64748b;">+ Customer</div>
+              <div style="background:#3b82f6;color:white;border-radius:4px;padding:3px 6px;font-size:8px;">+ I replied</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B — 左右分栏</h3>
+      <p>左侧：客户信息+SKU+摘要字段；右侧：对话气泡区。两栏并排，一屏完成，不需要滚动到底部</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;font-family:sans-serif;font-size:11px;height:190px;">
+        <!-- Compact all-in-one -->
+        <div style="background:white;border-bottom:1px solid #e2e8f0;padding:8px 14px;display:flex;justify-content:space-between;align-items:center;">
+          <span style="color:#1e293b;font-weight:600;">New Case</span>
+          <div style="display:flex;gap:6px;">
+            <div style="background:#3b82f6;color:white;border-radius:6px;padding:4px 12px;font-size:10px;font-weight:600;">Save Case</div>
+            <div style="color:#94a3b8;font-size:10px;padding:4px 8px;">Cancel</div>
+          </div>
+        </div>
+        <div style="padding:10px 14px;display:flex;flex-direction:column;gap:7px;overflow:hidden;">
+          <!-- Compact row 1 -->
+          <div style="display:flex;gap:6px;">
+            <div style="flex:2;border:1px solid #e2e8f0;border-radius:5px;padding:5px 8px;font-size:9px;color:#94a3b8;">姓名 *</div>
+            <div style="flex:2;border:1px solid #e2e8f0;border-radius:5px;padding:5px 8px;font-size:9px;color:#94a3b8;">Order ID *</div>
+            <div style="flex:1.5;border:1px solid #e2e8f0;border-radius:5px;padding:5px 8px;font-size:9px;color:#94a3b8;">SKU *</div>
+          </div>
+          <!-- Chat area -->
+          <div style="background:white;border:1px solid #e2e8f0;border-radius:6px;padding:8px;height:60px;display:flex;flex-direction:column;gap:4px;">
+            <div style="background:#f1f5f9;border-radius:5px;padding:4px 7px;font-size:9px;color:#374151;align-self:flex-start;">Customer: damaged package…</div>
+            <div style="background:#3b82f6;color:white;border-radius:5px;padding:4px 7px;font-size:9px;align-self:flex-end;">Sorry to hear that…</div>
+          </div>
+          <!-- Row 3 -->
+          <div style="display:flex;gap:6px;">
+            <div style="flex:3;border:1px solid #e2e8f0;border-radius:5px;padding:5px 8px;font-size:9px;color:#94a3b8;">Issue summary *</div>
+            <div style="flex:1.5;border:1px solid #e2e8f0;border-radius:5px;padding:5px 8px;font-size:9px;color:#94a3b8;">Category</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C — 紧凑单页（优化滚动）</h3>
+      <p>保持单页滚动，但字段更紧凑，关键信息（姓名/订单/SKU）合并成一行，减少视觉噪音，Save 按钮固定在顶部</p>
+    </div>
+  </div>
+
+</div>
+
+<p class="subtitle" style="margin-top:16px;">点击选择，或告诉我想混合某些元素</p>

@@ -1,0 +1,154 @@
+<h2>整体框架设计 — 确认稿</h2>
+<p class="subtitle">展示侧边栏结构 + Assistant 页面效果，点击 ✓ 确认或告诉我需要调整的地方</p>
+
+<div class="mockup">
+  <div class="mockup-header">完整页面框架 — Assistant（首页）</div>
+  <div class="mockup-body" style="padding:0;">
+    <div style="display:flex;height:420px;font-family:'Inter',sans-serif;font-size:12px;background:#f1f5f9;">
+
+      <!-- ═══ SIDEBAR ═══ -->
+      <div style="width:200px;background:white;border-right:1px solid #e2e8f0;display:flex;flex-direction:column;padding:0;flex-shrink:0;">
+
+        <!-- Brand -->
+        <div style="padding:18px 16px 12px;border-bottom:1px solid #f1f5f9;">
+          <div style="font-size:11px;color:#94a3b8;font-weight:600;letter-spacing:.06em;text-transform:uppercase;margin-bottom:2px;">Customer Service</div>
+        </div>
+
+        <!-- Nav -->
+        <div style="padding:10px 8px;display:flex;flex-direction:column;gap:2px;flex:1;">
+
+          <!-- Assistant — active -->
+          <div style="background:#eff6ff;border-radius:7px;padding:9px 12px;display:flex;align-items:center;gap:8px;cursor:pointer;">
+            <span style="font-size:13px;">🔍</span>
+            <span style="color:#3b82f6;font-weight:600;font-size:12px;">Assistant</span>
+          </div>
+
+          <!-- Cases — with badge -->
+          <div style="border-radius:7px;padding:9px 12px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="font-size:13px;">📋</span>
+              <span style="color:#64748b;font-size:12px;">Cases</span>
+            </div>
+            <span style="background:#fef3c7;color:#d97706;font-size:9px;font-weight:700;padding:2px 7px;border-radius:99px;">3</span>
+          </div>
+
+          <!-- New Case button -->
+          <div style="margin-top:6px;background:#3b82f6;border-radius:7px;padding:9px 12px;display:flex;align-items:center;gap:8px;cursor:pointer;">
+            <span style="color:white;font-size:14px;font-weight:300;">＋</span>
+            <span style="color:white;font-weight:600;font-size:12px;">New Case</span>
+          </div>
+
+          <!-- Spacer -->
+          <div style="flex:1;min-height:16px;"></div>
+
+          <!-- Mini stats card -->
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;margin-bottom:8px;">
+            <div style="color:#94a3b8;font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;margin-bottom:8px;">本周</div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+              <span style="color:#64748b;font-size:10px;">新案例</span>
+              <span style="color:#1e293b;font-weight:700;font-size:13px;">12</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+              <span style="color:#64748b;font-size:10px;">已结案</span>
+              <span style="color:#16a34a;font-weight:700;font-size:13px;">9</span>
+            </div>
+            <div style="border-top:1px solid #e2e8f0;padding-top:6px;margin-top:2px;display:flex;justify-content:space-between;align-items:center;">
+              <span style="color:#64748b;font-size:10px;">Top SKU</span>
+              <span style="color:#f97316;font-weight:700;font-size:10px;">RX224-PINK</span>
+            </div>
+          </div>
+
+          <!-- Back to apps -->
+          <div style="padding:8px 12px;border-top:1px solid #f1f5f9;">
+            <span style="color:#94a3b8;font-size:10px;cursor:pointer;">← Back to APPs</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ MAIN CONTENT — ASSISTANT ═══ -->
+      <div style="flex:1;overflow-y:auto;padding:28px 32px;display:flex;flex-direction:column;gap:16px;">
+
+        <!-- Search area -->
+        <div>
+          <h1 style="font-size:18px;font-weight:700;color:#1e293b;margin:0 0 6px;">Assistant</h1>
+          <p style="color:#94a3b8;font-size:11px;margin:0 0 14px;">搜索客户问题，匹配相似案例与标准回复</p>
+          <div style="display:flex;gap:8px;">
+            <div style="flex:1;background:white;border:1.5px solid #e2e8f0;border-radius:10px;padding:11px 14px;color:#94a3b8;font-size:12px;box-shadow:0 1px 3px rgba(0,0,0,.04);">
+              Paste or type the customer's message…
+            </div>
+            <div style="background:#3b82f6;color:white;border-radius:10px;padding:11px 20px;font-size:12px;font-weight:600;cursor:pointer;box-shadow:0 1px 3px rgba(59,130,246,.3);">
+              Search
+            </div>
+          </div>
+        </div>
+
+        <!-- Section: Similar Past Cases -->
+        <div>
+          <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px;">Similar Past Cases (2)</div>
+
+          <!-- Case card -->
+          <div style="background:white;border:1px solid #e2e8f0;border-radius:12px;padding:14px 16px;margin-bottom:8px;box-shadow:0 1px 2px rgba(0,0,0,.04);">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+              <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                <span style="background:#eff6ff;color:#3b82f6;font-size:10px;font-weight:600;padding:2px 8px;border-radius:99px;">Product Issue</span>
+                <span style="color:#94a3b8;font-size:10px;font-family:monospace;">RX224-PINK-000</span>
+                <span style="color:#cbd5e1;">·</span>
+                <span style="color:#94a3b8;font-size:10px;">Jane Smith</span>
+                <span style="color:#cbd5e1;">·</span>
+                <span style="color:#94a3b8;font-size:10px;">#202-1234</span>
+              </div>
+              <span style="color:#94a3b8;font-size:10px;cursor:pointer;white-space:nowrap;">View ↗</span>
+            </div>
+            <p style="font-size:12px;font-weight:600;color:#1e293b;margin:0 0 8px;">产品收到时包装已严重损坏，内件破裂</p>
+            <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px 12px;position:relative;">
+              <p style="font-size:11px;color:#374151;line-height:1.5;margin:0 0 6px;">We are sorry to hear that. Please send us a photo of the damage along with your order number and we will arrange a replacement or full refund immediately.</p>
+              <div style="display:flex;justify-content:flex-end;">
+                <span style="background:white;border:1px solid #bbf7d0;color:#16a34a;font-size:10px;font-weight:600;padding:3px 10px;border-radius:6px;cursor:pointer;">📋 Copy</span>
+              </div>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:8px;">
+              <span style="background:#f1f5f9;color:#64748b;font-size:10px;padding:2px 8px;border-radius:99px;">damaged</span>
+              <span style="background:#f1f5f9;color:#64748b;font-size:10px;padding:2px 8px;border-radius:99px;">package</span>
+              <span style="background:#f1f5f9;color:#64748b;font-size:10px;padding:2px 8px;border-radius:99px;">broken</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section: Standard Replies -->
+        <div>
+          <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px;">Standard Replies (1)</div>
+          <div style="background:white;border:1px solid #e2e8f0;border-radius:12px;padding:14px 16px;box-shadow:0 1px 2px rgba(0,0,0,.04);">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+              <span style="background:#f5f3ff;color:#7c3aed;font-size:10px;font-weight:600;padding:2px 8px;border-radius:99px;">Order &amp; Shipping</span>
+            </div>
+            <p style="font-size:10px;color:#94a3b8;font-style:italic;margin:0 0 8px;">My package arrived damaged.</p>
+            <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px 12px;">
+              <p style="font-size:11px;color:#374151;line-height:1.5;margin:0 0 6px;">We are sorry to hear that. Please send us a photo of the damage along with your order number…</p>
+              <div style="display:flex;justify-content:flex-end;">
+                <span style="background:white;border:1px solid #bfdbfe;color:#3b82f6;font-size:10px;font-weight:600;padding:3px 10px;border-radius:6px;cursor:pointer;">📋 Copy</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="options" style="margin-top:16px;">
+  <div class="option" data-choice="approve" onclick="toggleSelect(this)">
+    <div class="letter">✓</div>
+    <div class="content">
+      <h3>确认此方向</h3>
+      <p>框架 + Assistant 页看起来没问题，继续看下一段（Cases + New Case + Case Detail）</p>
+    </div>
+  </div>
+  <div class="option" data-choice="adjust" onclick="toggleSelect(this)">
+    <div class="letter">✎</div>
+    <div class="content">
+      <h3>需要调整</h3>
+      <p>在下方告诉我哪里需要修改</p>
+    </div>
+  </div>
+</div>
