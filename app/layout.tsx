@@ -42,7 +42,7 @@ export default function RootLayout({
             Assistant
           </Link>
           <Link href="/cases" className="text-sm text-gray-500 hover:text-gray-800 transition-colors">
-            Case Library
+            Cases
           </Link>
         </nav>
         {children}

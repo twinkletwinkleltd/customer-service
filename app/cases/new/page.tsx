@@ -3,7 +3,8 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { extractKeywords } from '@/lib/keywords'
-import type { Message, CustomerInfo, NewCaseData } from '@/lib/cases'
+import type { Message, CustomerInfo } from '@/lib/types'
+import type { NewCaseData } from '@/lib/cases'
 
 const CATEGORIES = ['Product Issue', 'Order & Shipping', 'Refunds & Returns', 'Billing', 'Other']
 
