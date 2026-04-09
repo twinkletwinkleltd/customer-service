@@ -44,12 +44,6 @@ export default function RootLayout({
           <Link href="/cases" className="text-sm text-gray-500 hover:text-gray-800 transition-colors">
             Case Library
           </Link>
-          <Link href="/ssys" className="text-sm text-gray-500 hover:text-gray-800 transition-colors">
-            SSYS
-          </Link>
-          <Link href="/pending" className="text-sm text-gray-500 hover:text-gray-800 transition-colors">
-            Pending SKUs
-          </Link>
         </nav>
         {children}
       </body>
