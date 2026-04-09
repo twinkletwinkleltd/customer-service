@@ -4,9 +4,10 @@ Last updated: 2026-04-09
 
 ## Current status
 
-- `customer-service` remains an independent app with its own repository and VPS deployment.
-- Portal entry is available through `/apps`.
-- Path handling was adjusted so the app can connect back to `portal-system` shared data instead of relying on fragile relative paths.
+- `customer-service` 独立仓库，独立 VPS 部署，运行于端口 3001。
+- 今日完成全面 UI 改版：左侧边栏导航 + 所有页面分栏布局，已构建并部署至 VPS（commit `0eefa4d`）。
+- 9 条路由均正常生成，服务状态 `active (running)`。
+- Portal 入口通过 `/apps` 可访问。
 
 ## 2026-04-09 — 完整重建：客户案例管理系统
 
@@ -108,9 +109,10 @@ Last updated: 2026-04-09
 
 ## Next likely work
 
-- 录入真实客户案例，积累数据后验证搜索质量
-- 考虑为 Assistant 页支持 URL 参数 `?q=` 预填充（Case Detail 的 Find Similar 已使用此模式，但 Assistant 页尚未读取该参数）
+- 开始录入真实客户案例，积累数据后验证 Assistant 搜索质量
+- Assistant 页支持 URL 参数 `?q=` 预填充（Case Detail 的 Find Similar 已生成此链接，但 Assistant 页 `app/page.tsx` 尚未读取 `searchParams`）
 - 如需多用户并发写入，可考虑加文件锁或迁移至 SQLite
+- 可考虑为 Cases 列表添加排序功能（按日期 / 状态 / SKU）
 
 ## Risks / notes
 
