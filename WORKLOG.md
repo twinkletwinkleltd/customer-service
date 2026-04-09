@@ -56,6 +56,49 @@ Last updated: 2026-04-09
 
 ---
 
+## 2026-04-09 — UI 全面优化：左侧边栏 + 分栏布局
+
+### 改动概览
+
+本次对所有页面进行 UI 重设计，以左侧导航栏为骨架，Assistant、Cases 列表、新建案例、案例详情均作了针对性优化。
+
+### 新增组件
+
+| 文件 | 说明 |
+|------|------|
+| `app/components/SidebarClient.tsx` | 新建客户端侧边栏组件，替代旧的顶部导航 |
+
+**侧边栏功能：**
+- 品牌标题栏（Customer Service）
+- 导航项：Assistant（搜索）、Cases（列表）
+- Cases 徽章：未关闭案例数，实时从 `/api/cases` 计算
+- 蓝色 "+ New Case" 快捷按钮
+- **本周统计迷你卡**：7 天内新案例数、已结案数、Top SKU
+- "← Back to APPs" 返回链接
+
+### 布局变更
+
+| 文件 | 变更内容 |
+|------|---------|
+| `app/layout.tsx` | 移除顶部导航；`<body>` 改为 flex 横排；左侧渲染 `<SidebarClient />`，右侧 `<main>` 填充剩余空间 |
+| `app/page.tsx`（Assistant）| 添加标题 + 中文副标题；使用 slate 色系；Copy 按钮改为独立行，右对齐 |
+| `app/cases/page.tsx`（Cases 列表）| 状态筛选改为三段式 pill 按钮（All / Open / Resolved）；表头加 `bg-slate-50`，列宽更合理；行间距调大至 `py-3.5` |
+| `app/cases/new/page.tsx`（新建案例）| **左右分栏**：左侧固定宽度 420px 含所有填写字段 + 底部粘性保存栏；右侧弹性宽对话记录区，支持实时添加气泡消息 |
+| `app/cases/[id]/page.tsx`（案例详情）| **左右分栏**：左侧含客户信息网格、关键词标签、状态/分类 select、解决方案文本框、保存/删除操作栏；右侧只读对话气泡 + 底部解决方案预览区（带 Copy 按钮） |
+
+### 交互细节
+
+- 案例详情保存后显示 "✓ Saved" 反馈，2 秒后自动恢复按钮文字
+- 案例详情右下角解决方案区随左侧输入实时更新（live preview）
+- 新建案例对话框：Enter 默认添加为"客户消息"，Shift+Enter 换行；"✕ Remove last message" 悔棋按钮
+
+### 部署
+
+- 已推送至 `customer-service` GitHub 仓库（commit `f4b2ea9`）
+- VPS 部署待手动执行：`git pull && npm run build && sudo systemctl restart customer-service`
+
+---
+
 ## Changes completed previously
 
 - The app was renamed from `support-system` to `customer-service`.
