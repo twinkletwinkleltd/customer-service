@@ -1,213 +1,146 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { saveHistory, getHistory } from '@/lib/history'
-import type { SupportCase } from '@/lib/store'
+import { useState } from 'react'
+import Link from 'next/link'
+import type { SearchResult } from '@/lib/types'
 
-interface ReplyResponse {
-  suggestedReply: string
-  matchedCases: SupportCase[]
-}
+export default function AssistantPage() {
+  const [query, setQuery]       = useState('')
+  const [results, setResults]   = useState<SearchResult[]>([])
+  const [loading, setLoading]   = useState(false)
+  const [searched, setSearched] = useState(false)
 
-const getInventory = async (sku: string) => {
-  const res = await fetch(`/api/inventory?sku=${sku}`)
-  return res.json()
-}
-
-export default function Home() {
-  const [sku, setSku] = useState("")
-  const [debouncedSku, setDebouncedSku] = useState("")
-  const [inventoryResult, setInventoryResult] = useState<any>(null)
-  const [loading, setLoading] = useState(false)
-  const [history, setHistory] = useState<any[]>([])
-
-  useEffect(() => {
-    setHistory(getHistory())
-  }, [])
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSku(sku)
-    }, 400)
-    return () => clearTimeout(timer)
-  }, [sku])
-
-  useEffect(() => {
-    if (!debouncedSku) return
-
-    const run = async () => {
-      setLoading(true)
-      const data = await getInventory(debouncedSku)
-      setInventoryResult(data)
-      saveHistory(debouncedSku, data)
-      setHistory(getHistory())
-      setLoading(false)
-    }
-
-    run()
-  }, [debouncedSku])
-
-  const [question, setQuestion] = useState('')
-  const [result, setResult] = useState<ReplyResponse | null>(null)
-  const [replyLoading, setReplyLoading] = useState(false)
-
-  async function handleGenerateReply() {
-    if (!question.trim()) return
-    setReplyLoading(true)
-    setResult(null)
-    const res = await fetch('/api/reply', {
-      method: 'POST',
+  async function handleSearch(e: React.FormEvent) {
+    e.preventDefault()
+    if (!query.trim()) return
+    setLoading(true)
+    const res  = await fetch('/api/search', {
+      method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question }),
+      body:    JSON.stringify({ query }),
     })
-    const data: ReplyResponse = await res.json()
-    setResult(data)
-    setReplyLoading(false)
+    const data = await res.json() as SearchResult[]
+    setResults(data)
+    setSearched(true)
+    setLoading(false)
   }
 
+  const caseResults  = results.filter((r) => r.type === 'case')
+  const replyResults = results.filter((r) => r.type === 'reply')
+
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
-      <div className="bg-white rounded-2xl shadow-md w-full max-w-2xl p-8 flex flex-col gap-6">
+    <div className="min-h-screen bg-gray-50 p-6">
+      <div className="max-w-3xl mx-auto flex flex-col gap-6">
 
-        {/* Inventory Lookup */}
-        <div>
-          <h2>Inventory Lookup</h2>
-
+        {/* Search bar */}
+        <form onSubmit={handleSearch} className="flex gap-3">
           <input
-            value={sku}
-            onChange={(e) => setSku(e.target.value.trim())}
-            placeholder="Enter SKU"
+            className="flex-1 border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white shadow-sm"
+            placeholder="Paste or type the customer's message…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
           />
-
-          {loading && <p>Checking...</p>}
-
-          {inventoryResult && inventoryResult.sku && (
-            <div>
-              <p>SKU: {inventoryResult.sku}</p>
-              <p>Stock: {inventoryResult.stock}</p>
-              <p>
-                Status:{" "}
-                <span style={{ color: inventoryResult.stock > 0 ? "green" : "red" }}>
-                  {inventoryResult.status}
-                </span>
-              </p>
-            </div>
-          )}
-
-          <input
-            type="file"
-            accept=".xlsx"
-            onChange={async (e) => {
-              const file = e.target.files?.[0]
-              if (!file) return
-
-              const formData = new FormData()
-              formData.append("file", file)
-
-              const res = await fetch("/api/inventory/upload", {
-                method: "POST",
-                body: formData,
-              })
-
-              const data = await res.json()
-
-              if (data.success) {
-                alert(`Inventory rebuilt: ${data.count} SKU(s). ${data.message}`)
-              } else {
-                alert(`Rebuild failed: ${data.message}`)
-              }
-
-              if (sku) {
-                const verify = await getInventory(sku)
-                setInventoryResult(verify)
-              }
-            }}
-          />
-
           <button
-            onClick={() => {
-              window.open("/api/inventory/export")
-            }}
+            type="submit"
+            disabled={loading || !query.trim()}
+            className="bg-blue-600 text-white rounded-xl px-6 py-3 text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors shadow-sm"
           >
-            Export CSV
+            {loading ? 'Searching…' : 'Search'}
           </button>
+        </form>
 
-          <div>
-            <h3>Recent Searches</h3>
-            {history.map((item, i) => (
-              <div key={i}>
-                <span>{item.sku}</span> -{" "}
-                <span>{item.result?.stock}</span>
-              </div>
-            ))}
+        {/* No results */}
+        {searched && results.length === 0 && (
+          <div className="bg-white rounded-2xl shadow-sm p-6 text-sm text-gray-400 text-center">
+            No matching cases or replies found.{' '}
+            <Link href="/cases/new" className="text-blue-500 hover:underline">
+              Record this as a new case?
+            </Link>
           </div>
-        </div>
-
-        <hr className="border-gray-200" />
-
-        {/* Customer Support Assistant */}
-        <h1 className="text-2xl font-semibold text-gray-800">Customer Support Assistant</h1>
-
-        {/* Input */}
-        <div className="flex flex-col gap-2">
-          <label className="text-sm font-medium text-gray-600" htmlFor="question">
-            Customer Question
-          </label>
-          <textarea
-            id="question"
-            className="border border-gray-300 rounded-lg p-3 text-sm text-gray-700 resize-none focus:outline-none focus:ring-2 focus:ring-blue-400"
-            rows={4}
-            placeholder="Paste the customer's question here..."
-            value={question}
-            onChange={(e) => setQuestion(e.target.value)}
-          />
-        </div>
-
-        <button
-          onClick={handleGenerateReply}
-          disabled={replyLoading || !question.trim()}
-          className="bg-blue-600 text-white rounded-lg py-2.5 text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        >
-          {replyLoading ? 'Generating...' : 'Generate Reply'}
-        </button>
-
-        {result && (
-          <>
-            {/* Suggested Reply */}
-            <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium text-gray-600">Suggested Reply</label>
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-gray-700 leading-relaxed">
-                {result.suggestedReply}
-              </div>
-            </div>
-
-            {/* Matched Cases */}
-            {result.matchedCases.length > 0 && (
-              <div className="flex flex-col gap-3">
-                <label className="text-sm font-medium text-gray-600">
-                  Matched Historical Cases ({result.matchedCases.length})
-                </label>
-                <div className="flex flex-col gap-3">
-                  {result.matchedCases.map((c) => (
-                    <div
-                      key={c.id}
-                      className="border border-gray-200 rounded-lg p-4 flex flex-col gap-2 bg-gray-50"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-blue-600 uppercase tracking-wide">
-                          {c.category}
-                        </span>
-                        <span className="text-xs text-gray-400">{c.id}</span>
-                      </div>
-                      <p className="text-sm text-gray-700 font-medium">{c.customerQuestion}</p>
-                      <p className="text-sm text-gray-500 leading-relaxed">{c.standardReply}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </>
         )}
+
+        {/* Past Cases */}
+        {caseResults.length > 0 && (
+          <div className="flex flex-col gap-3">
+            <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+              Similar Past Cases ({caseResults.length})
+            </h2>
+            {caseResults.map((r) => {
+              const c = r.case!
+              return (
+                <div key={c.id} className="bg-white rounded-2xl shadow-sm p-5 flex flex-col gap-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+                        {c.category}
+                      </span>
+                      <span className="text-xs text-gray-400">{c.standardSku}</span>
+                      <span className="text-xs text-gray-300">·</span>
+                      <span className="text-xs text-gray-400">{c.customer.name}</span>
+                      <span className="text-xs text-gray-300">·</span>
+                      <span className="text-xs text-gray-400">{c.customer.orderId}</span>
+                    </div>
+                    <Link
+                      href={`/cases/${c.id}`}
+                      className="text-xs text-gray-400 hover:text-gray-700 shrink-0"
+                    >
+                      View ↗
+                    </Link>
+                  </div>
+                  <p className="text-sm font-medium text-gray-800">{c.issue}</p>
+                  {c.resolution && (
+                    <div className="bg-green-50 border border-green-100 rounded-lg p-3 text-sm text-gray-700 leading-relaxed">
+                      {c.resolution}
+                      <button
+                        onClick={() => navigator.clipboard.writeText(c.resolution)}
+                        className="ml-2 text-xs text-green-600 hover:text-green-800"
+                      >
+                        Copy
+                      </button>
+                    </div>
+                  )}
+                  <div className="flex flex-wrap gap-1">
+                    {c.keywords.map((k) => (
+                      <span key={k} className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{k}</span>
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {/* Standard Replies */}
+        {replyResults.length > 0 && (
+          <div className="flex flex-col gap-3">
+            <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+              Standard Replies ({replyResults.length})
+            </h2>
+            {replyResults.map((r) => {
+              const reply = r.reply!
+              return (
+                <div key={reply.id} className="bg-white rounded-2xl shadow-sm p-5 flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full">
+                      {reply.category}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-400 italic">{reply.question}</p>
+                  <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 text-sm text-gray-700 leading-relaxed">
+                    {reply.reply}
+                    <button
+                      onClick={() => navigator.clipboard.writeText(reply.reply)}
+                      className="ml-2 text-xs text-blue-500 hover:text-blue-700"
+                    >
+                      Copy
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
       </div>
     </div>
   )
