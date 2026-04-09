@@ -1,249 +1,153 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
-import type { SupportCase } from '@/lib/store'
-import type { ImportResult } from '@/app/api/cases/import/route'
+import { useEffect, useState } from 'react'
+import Link from 'next/link'
+import type { CustomerCase } from '@/lib/types'
 
-const EMPTY_FORM = {
-  category: '',
-  customerQuestion: '',
-  standardReply: '',
-  keywords: '',
+const STATUS_COLORS = {
+  open:     'bg-yellow-100 text-yellow-700',
+  resolved: 'bg-green-100 text-green-700',
 }
 
+const CATEGORIES = ['All', 'Product Issue', 'Order & Shipping', 'Refunds & Returns', 'Billing', 'Other']
+
 export default function CasesPage() {
-  const [cases, setCases] = useState<SupportCase[]>([])
-  const [form, setForm] = useState(EMPTY_FORM)
-  const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState('')
+  const [cases,      setCases]      = useState<CustomerCase[]>([])
+  const [loading,    setLoading]    = useState(true)
+  const [search,     setSearch]     = useState('')
+  const [statusFilt, setStatusFilt] = useState('all')
+  const [catFilt,    setCatFilt]    = useState('All')
 
-  // CSV import state
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const [importing, setImporting] = useState(false)
-  const [importResult, setImportResult] = useState<ImportResult | null>(null)
-  const [importError, setImportError] = useState('')
-
-  async function loadCases() {
+  async function load() {
+    setLoading(true)
     const res = await fetch('/api/cases')
-    const data = await res.json()
-    setCases(data)
+    setCases(await res.json())
+    setLoading(false)
   }
 
-  useEffect(() => {
-    loadCases()
-  }, [])
+  useEffect(() => { load() }, [])
 
-  async function handleCreate(e: React.FormEvent) {
-    e.preventDefault()
-    setError('')
-    setSubmitting(true)
+  const filtered = cases.filter((c) => {
+    if (statusFilt !== 'all' && c.status !== statusFilt) return false
+    if (catFilt !== 'All' && c.category !== catFilt) return false
+    const q = search.toLowerCase()
+    return !q ||
+      c.customer.name.toLowerCase().includes(q) ||
+      c.customer.orderId.toLowerCase().includes(q) ||
+      c.standardSku.toLowerCase().includes(q) ||
+      c.issue.toLowerCase().includes(q)
+  })
 
-    const keywords = form.keywords
-      .split(',')
-      .map((k) => k.trim())
-      .filter(Boolean)
-
-    const res = await fetch('/api/cases', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...form, keywords }),
-    })
-
-    if (!res.ok) {
-      setError('Failed to create case. Please fill in all fields.')
-      setSubmitting(false)
-      return
-    }
-
-    setForm(EMPTY_FORM)
-    setSubmitting(false)
-    loadCases()
-  }
-
-  async function handleDelete(id: string) {
-    await fetch(`/api/cases/${id}`, { method: 'DELETE' })
-    loadCases()
-  }
-
-  async function handleImport() {
-    const file = fileInputRef.current?.files?.[0]
-    if (!file) return
-    setImporting(true)
-    setImportResult(null)
-    setImportError('')
-
-    const formData = new FormData()
-    formData.append('file', file)
-
-    const res = await fetch('/api/cases/import', { method: 'POST', body: formData })
-    const data = await res.json()
-
-    if (!res.ok) {
-      setImportError(data.error ?? 'Import failed')
-    } else {
-      setImportResult(data as ImportResult)
-      loadCases()
-    }
-
-    if (fileInputRef.current) fileInputRef.current.value = ''
-    setImporting(false)
-  }
+  // SKU stats for defect-rate indicator
+  const skuCounts: Record<string, number> = {}
+  for (const c of cases) skuCounts[c.standardSku] = (skuCounts[c.standardSku] ?? 0) + 1
+  const topSkus = Object.entries(skuCounts).sort((a, b) => b[1] - a[1]).slice(0, 5)
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-4xl mx-auto flex flex-col gap-8">
-        <h1 className="text-2xl font-semibold text-gray-800">Case Library</h1>
+      <div className="max-w-5xl mx-auto flex flex-col gap-6">
 
-        {/* Create Form */}
-        <div className="bg-white rounded-2xl shadow-md p-6">
-          <h2 className="text-base font-semibold text-gray-700 mb-4">Add New Case</h2>
-          <form onSubmit={handleCreate} className="flex flex-col gap-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Category</label>
-                <input
-                  type="text"
-                  className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                  placeholder="e.g. Billing"
-                  value={form.category}
-                  onChange={(e) => setForm({ ...form, category: e.target.value })}
-                />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Keywords (comma-separated)</label>
-                <input
-                  type="text"
-                  className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                  placeholder="e.g. invoice, receipt, bill"
-                  value={form.keywords}
-                  onChange={(e) => setForm({ ...form, keywords: e.target.value })}
-                />
-              </div>
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Customer Question</label>
-              <textarea
-                rows={2}
-                className="border border-gray-300 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-400"
-                placeholder="Typical customer question for this case..."
-                value={form.customerQuestion}
-                onChange={(e) => setForm({ ...form, customerQuestion: e.target.value })}
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Standard Reply</label>
-              <textarea
-                rows={3}
-                className="border border-gray-300 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-400"
-                placeholder="The standard reply for this case..."
-                value={form.standardReply}
-                onChange={(e) => setForm({ ...form, standardReply: e.target.value })}
-              />
-            </div>
-            {error && <p className="text-sm text-red-500">{error}</p>}
-            <div className="flex justify-end">
-              <button
-                type="submit"
-                disabled={submitting}
-                className="bg-blue-600 text-white rounded-lg px-5 py-2 text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
-              >
-                {submitting ? 'Adding...' : 'Add Case'}
-              </button>
-            </div>
-          </form>
-        </div>
-
-        {/* CSV Import */}
-        <div className="bg-white rounded-2xl shadow-md p-6">
-          <h2 className="text-base font-semibold text-gray-700 mb-1">Import from CSV</h2>
-          <p className="text-xs text-gray-400 mb-4">
-            Required columns: <code className="bg-gray-100 px-1 rounded">category</code>,{' '}
-            <code className="bg-gray-100 px-1 rounded">customerQuestion</code>,{' '}
-            <code className="bg-gray-100 px-1 rounded">standardReply</code>,{' '}
-            <code className="bg-gray-100 px-1 rounded">keywords</code>{' '}
-            (keywords are comma-separated within the field)
-          </p>
-          <div className="flex items-center gap-3">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".csv"
-              className="text-sm text-gray-600 file:mr-3 file:py-1.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200"
-            />
-            <button
-              onClick={handleImport}
-              disabled={importing}
-              className="bg-green-600 text-white rounded-lg px-5 py-2 text-sm font-medium hover:bg-green-700 disabled:opacity-50 transition-colors shrink-0"
-            >
-              {importing ? 'Importing...' : 'Import'}
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-semibold text-gray-800">Cases</h1>
+          <Link href="/cases/new">
+            <button className="bg-blue-600 text-white rounded-xl px-5 py-2 text-sm font-medium hover:bg-blue-700 transition-colors">
+              + New Case
             </button>
-          </div>
-
-          {importError && (
-            <p className="mt-3 text-sm text-red-500">{importError}</p>
-          )}
-
-          {importResult && (
-            <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-4 flex flex-col gap-2">
-              <div className="flex gap-6 text-sm">
-                <span className="text-gray-500">Total rows: <strong className="text-gray-800">{importResult.total}</strong></span>
-                <span className="text-green-600">Imported: <strong>{importResult.imported}</strong></span>
-                <span className="text-yellow-600">Skipped: <strong>{importResult.skipped}</strong></span>
-              </div>
-              {importResult.errors.length > 0 && (
-                <ul className="mt-1 flex flex-col gap-1">
-                  {importResult.errors.map((e, i) => (
-                    <li key={i} className="text-xs text-red-500">{e}</li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          )}
+          </Link>
         </div>
 
-        {/* Cases Table */}
-        <div className="bg-white rounded-2xl shadow-md overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-            <h2 className="text-base font-semibold text-gray-700">All Cases</h2>
-            <span className="text-sm text-gray-400">{cases.length} cases</span>
+        {/* SKU stats strip */}
+        {topSkus.length > 0 && (
+          <div className="bg-white rounded-2xl shadow-sm p-4 flex flex-wrap gap-3 items-center">
+            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Top SKUs:</span>
+            {topSkus.map(([sku, count]) => (
+              <button
+                key={sku}
+                onClick={() => setSearch(sku)}
+                className="text-xs bg-orange-50 text-orange-700 border border-orange-100 px-3 py-1 rounded-full hover:bg-orange-100 transition-colors"
+              >
+                {sku} <span className="font-bold">{count}</span>
+              </button>
+            ))}
           </div>
-          {cases.length === 0 ? (
-            <p className="text-sm text-gray-400 p-6">No cases yet.</p>
-          ) : (
-            <div className="divide-y divide-gray-100">
-              {cases.map((c) => (
-                <div key={c.id} className="p-5 flex flex-col gap-2">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-semibold text-blue-600 uppercase tracking-wide">
-                        {c.category}
-                      </span>
-                      <span className="text-xs text-gray-400">{c.id}</span>
-                    </div>
-                    <button
-                      onClick={() => handleDelete(c.id)}
-                      className="text-xs text-red-400 hover:text-red-600 transition-colors shrink-0"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                  <p className="text-sm font-medium text-gray-800">{c.customerQuestion}</p>
-                  <p className="text-sm text-gray-500 leading-relaxed">{c.standardReply}</p>
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {c.keywords.map((kw) => (
-                      <span
-                        key={kw}
-                        className="bg-gray-100 text-gray-500 text-xs px-2 py-0.5 rounded-full"
-                      >
-                        {kw}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+        )}
+
+        {/* Filters */}
+        <div className="flex flex-wrap gap-3 items-center">
+          <input
+            className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white w-56"
+            placeholder="Search name / order / SKU / issue…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          <select
+            value={statusFilt}
+            onChange={(e) => setStatusFilt(e.target.value)}
+            className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none bg-white"
+          >
+            <option value="all">All statuses</option>
+            <option value="open">Open</option>
+            <option value="resolved">Resolved</option>
+          </select>
+          <select
+            value={catFilt}
+            onChange={(e) => setCatFilt(e.target.value)}
+            className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none bg-white"
+          >
+            {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
+          </select>
+          <span className="text-sm text-gray-400 ml-auto">{filtered.length} cases</span>
         </div>
+
+        {/* Table */}
+        {loading ? (
+          <p className="text-sm text-gray-400">Loading…</p>
+        ) : filtered.length === 0 ? (
+          <div className="bg-white rounded-2xl shadow-sm p-8 text-center text-sm text-gray-400">
+            No cases found.
+          </div>
+        ) : (
+          <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-100 text-xs text-gray-400 uppercase tracking-wide">
+                  <th className="px-5 py-3 text-left font-medium">ID</th>
+                  <th className="px-5 py-3 text-left font-medium">Customer</th>
+                  <th className="px-5 py-3 text-left font-medium">Order</th>
+                  <th className="px-5 py-3 text-left font-medium">SKU</th>
+                  <th className="px-5 py-3 text-left font-medium">Issue</th>
+                  <th className="px-5 py-3 text-left font-medium">Status</th>
+                  <th className="px-5 py-3 text-left font-medium">Date</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {filtered.map((c) => (
+                  <tr
+                    key={c.id}
+                    className="hover:bg-gray-50 transition-colors cursor-pointer"
+                    onClick={() => window.location.href = `/cases/${c.id}`}
+                  >
+                    <td className="px-5 py-3 font-mono text-xs text-gray-400">{c.id}</td>
+                    <td className="px-5 py-3 text-gray-700">{c.customer.name}</td>
+                    <td className="px-5 py-3 font-mono text-xs text-gray-500">{c.customer.orderId}</td>
+                    <td className="px-5 py-3 font-mono text-xs text-gray-600">{c.standardSku}</td>
+                    <td className="px-5 py-3 text-gray-600 max-w-xs truncate">{c.issue}</td>
+                    <td className="px-5 py-3">
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${STATUS_COLORS[c.status]}`}>
+                        {c.status}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3 text-xs text-gray-400">
+                      {c.createdAt.slice(0, 10)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
       </div>
     </div>
   )
