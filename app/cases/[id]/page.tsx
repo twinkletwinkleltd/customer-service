@@ -1,14 +1,25 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import type { CustomerCase } from '@/lib/types'
+import type { Attachment, CustomerCase } from '@/lib/types'
+import { ACCOUNT_DISPLAY } from '@/lib/types'
 
 const CATEGORIES = ['Product Issue', 'Order & Shipping', 'Refunds & Returns', 'Billing', 'Other']
 
 const STATUS_COLORS = {
   open:     'bg-amber-50 text-amber-700 border border-amber-200',
   resolved: 'bg-green-50 text-green-700 border border-green-200',
+}
+
+const ACCOUNT_COLORS: Record<string, string> = {
+  gorble:   'bg-purple-50 text-purple-700 border border-purple-200',
+  ssys:     'bg-blue-50 text-blue-700 border border-blue-200',
+  ama_tktk: 'bg-orange-50 text-orange-700 border border-orange-200',
+}
+
+function salesNo(c: CustomerCase): string {
+  return c.customer.salesRecordNo || c.customer.orderId || ''
 }
 
 export default function CaseDetailPage() {
@@ -22,6 +33,10 @@ export default function CaseDetailPage() {
   const [resolution, setResolution] = useState('')
   const [status,     setStatus]     = useState<'open' | 'resolved'>('open')
   const [category,   setCategory]   = useState('')
+
+  const [uploading, setUploading] = useState(false)
+  const [uploadErr, setUploadErr] = useState('')
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   async function load() {
     const res = await fetch(`/api/cases/${id}`)
@@ -55,8 +70,39 @@ export default function CaseDetailPage() {
     router.push('/cases')
   }
 
+  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(true)
+    setUploadErr('')
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      const res = await fetch(`/api/cases/${id}/attachments`, { method: 'POST', body: fd })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        setUploadErr(data.error ?? `Upload failed (${res.status})`)
+      } else {
+        await load()
+      }
+    } catch (err) {
+      setUploadErr((err as Error).message)
+    } finally {
+      setUploading(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
+  async function handleDeleteAttachment(att: Attachment) {
+    if (!confirm(`Delete attachment "${att.originalName}"?`)) return
+    const res = await fetch(`/api/cases/${id}/attachments/${att.id}`, { method: 'DELETE' })
+    if (res.ok) await load()
+  }
+
   if (loading) return <div className="p-8 text-sm text-slate-400">Loading…</div>
   if (!c)      return <div className="p-8 text-sm text-slate-400">Case not found.</div>
+
+  const attachments = c.attachments ?? []
 
   return (
     <div className="flex h-full min-h-screen">
@@ -75,6 +121,22 @@ export default function CaseDetailPage() {
               {status}
             </span>
           </div>
+
+          {/* Account + creator badges */}
+          <div className="flex flex-wrap gap-2 mt-3">
+            {c.account ? (
+              <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${ACCOUNT_COLORS[c.account] ?? 'bg-slate-100 text-slate-600 border border-slate-200'}`}>
+                {ACCOUNT_DISPLAY[c.account]}
+              </span>
+            ) : (
+              <span className="text-xs px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-400 border border-slate-200">
+                account: —
+              </span>
+            )}
+            <span className="text-xs font-mono px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+              {c.creator ?? 'creator: —'}
+            </span>
+          </div>
         </div>
 
         {/* Scrollable content */}
@@ -85,12 +147,12 @@ export default function CaseDetailPage() {
             <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Customer</p>
             <div className="grid grid-cols-2 gap-x-4 gap-y-3">
               {([
-                ['Name',     c.customer.name],
-                ['Order ID', c.customer.orderId],
-                ['Address',  c.customer.address1],
-                ['Postcode', c.customer.postcode],
-                ['Email',    c.customer.email],
-                ['SKU',      c.standardSku],
+                ['Name',             c.customer.name],
+                ['Sales record no.', salesNo(c)],
+                ['Address',          c.customer.address1],
+                ['Postcode',         c.customer.postcode],
+                ['Email',            c.customer.email],
+                ['SKU',              c.standardSku],
               ] as [string, string][]).map(([label, val]) => (
                 <div key={label}>
                   <p className="text-xs text-slate-400">{label}</p>
@@ -147,6 +209,57 @@ export default function CaseDetailPage() {
               className="border border-slate-200 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-400"
               placeholder="Final reply sent or outcome…"
             />
+          </div>
+
+          {/* Attachments */}
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Attachments</p>
+              <span className="text-xs text-slate-400">{attachments.length}</span>
+            </div>
+
+            {attachments.length === 0 ? (
+              <p className="text-xs text-slate-400">No attachments yet.</p>
+            ) : (
+              <div className="grid grid-cols-3 gap-2">
+                {attachments.map((a) => {
+                  const url = `/api/cases/${c.id}/attachments/${a.id}`
+                  return (
+                    <div key={a.id} className="relative group border border-slate-200 rounded-lg overflow-hidden bg-slate-50">
+                      <a href={url} target="_blank" rel="noreferrer" title={a.originalName}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={url}
+                          alt={a.originalName}
+                          className="block w-full h-24 object-cover"
+                        />
+                      </a>
+                      <button
+                        onClick={() => handleDeleteAttachment(a)}
+                        className="absolute top-1 right-1 bg-white/90 text-red-500 border border-red-200 rounded-full w-6 h-6 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="Delete attachment"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            <label className="mt-1 inline-flex items-center gap-2 text-xs font-semibold text-blue-600 border border-blue-200 bg-blue-50 hover:bg-blue-100 rounded-lg px-3 py-1.5 cursor-pointer transition-colors self-start">
+              {uploading ? 'Uploading…' : '+ Upload image'}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
+                className="hidden"
+                disabled={uploading}
+                onChange={handleUpload}
+              />
+            </label>
+            <p className="text-[10px] text-slate-400">jpg, jpeg, png, webp, gif · max 5 MB</p>
+            {uploadErr && <p className="text-xs text-red-500">{uploadErr}</p>}
           </div>
 
         </div>

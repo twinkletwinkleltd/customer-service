@@ -3,13 +3,24 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import type { CustomerCase } from '@/lib/types'
+import { ACCOUNT_DISPLAY } from '@/lib/types'
 
 const STATUS_COLORS = {
   open:     'bg-amber-50 text-amber-700',
   resolved: 'bg-green-50 text-green-700',
 }
 
+const ACCOUNT_COLORS: Record<string, string> = {
+  gorble:   'bg-purple-50 text-purple-700',
+  ssys:     'bg-blue-50 text-blue-700',
+  ama_tktk: 'bg-orange-50 text-orange-700',
+}
+
 const CATEGORIES = ['All', 'Product Issue', 'Order & Shipping', 'Refunds & Returns', 'Billing', 'Other']
+
+function salesNo(c: CustomerCase): string {
+  return c.customer.salesRecordNo || c.customer.orderId || ''
+}
 
 export default function CasesPage() {
   const [cases,      setCases]      = useState<CustomerCase[]>([])
@@ -33,9 +44,11 @@ export default function CasesPage() {
     const q = search.toLowerCase()
     return !q ||
       c.customer.name.toLowerCase().includes(q) ||
-      c.customer.orderId.toLowerCase().includes(q) ||
+      salesNo(c).toLowerCase().includes(q) ||
       c.standardSku.toLowerCase().includes(q) ||
-      c.issue.toLowerCase().includes(q)
+      c.issue.toLowerCase().includes(q) ||
+      (c.account ?? '').toLowerCase().includes(q) ||
+      (c.creator ?? '').toLowerCase().includes(q)
   })
 
   const skuCounts: Record<string, number> = {}
@@ -43,7 +56,7 @@ export default function CasesPage() {
   const topSkus = Object.entries(skuCounts).sort((a, b) => b[1] - a[1]).slice(0, 5)
 
   return (
-    <div className="p-8 max-w-5xl mx-auto flex flex-col gap-6">
+    <div className="p-8 max-w-6xl mx-auto flex flex-col gap-6">
 
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -74,8 +87,8 @@ export default function CasesPage() {
       {/* Filter bar */}
       <div className="flex flex-wrap gap-3 items-center">
         <input
-          className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white w-56 placeholder-slate-400"
-          placeholder="Search name / order / SKU / issue…"
+          className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white w-72 placeholder-slate-400"
+          placeholder="Search name / sales record / SKU / issue / account…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
@@ -125,8 +138,10 @@ export default function CasesPage() {
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200 text-xs text-slate-400 uppercase tracking-wider">
                 <th className="px-5 py-3 text-left font-semibold">ID</th>
+                <th className="px-5 py-3 text-left font-semibold">Account</th>
+                <th className="px-5 py-3 text-left font-semibold">Creator</th>
                 <th className="px-5 py-3 text-left font-semibold">Customer</th>
-                <th className="px-5 py-3 text-left font-semibold">Order</th>
+                <th className="px-5 py-3 text-left font-semibold">Sales record no.</th>
                 <th className="px-5 py-3 text-left font-semibold">SKU</th>
                 <th className="px-5 py-3 text-left font-semibold">Issue</th>
                 <th className="px-5 py-3 text-left font-semibold">Status</th>
@@ -141,8 +156,18 @@ export default function CasesPage() {
                   onClick={() => window.location.href = `/cases/${c.id}`}
                 >
                   <td className="px-5 py-3.5 font-mono text-xs text-slate-400">{c.id}</td>
+                  <td className="px-5 py-3.5">
+                    {c.account ? (
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${ACCOUNT_COLORS[c.account] ?? 'bg-slate-100 text-slate-600'}`}>
+                        {ACCOUNT_DISPLAY[c.account]}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-slate-300">—</span>
+                    )}
+                  </td>
+                  <td className="px-5 py-3.5 text-xs text-slate-500 font-mono">{c.creator ?? '—'}</td>
                   <td className="px-5 py-3.5 text-slate-700 font-medium">{c.customer.name}</td>
-                  <td className="px-5 py-3.5 font-mono text-xs text-slate-500">{c.customer.orderId}</td>
+                  <td className="px-5 py-3.5 font-mono text-xs text-slate-500">{salesNo(c) || '—'}</td>
                   <td className="px-5 py-3.5 font-mono text-xs text-slate-600">{c.standardSku}</td>
                   <td className="px-5 py-3.5 text-slate-600 max-w-xs truncate">{c.issue}</td>
                   <td className="px-5 py-3.5">

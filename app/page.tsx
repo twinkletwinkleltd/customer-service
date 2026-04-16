@@ -83,7 +83,7 @@ export default function AssistantPage() {
                     <span className="text-slate-200">·</span>
                     <span className="text-xs text-slate-400">{c.customer.name}</span>
                     <span className="text-slate-200">·</span>
-                    <span className="text-xs text-slate-400">{c.customer.orderId}</span>
+                    <span className="text-xs text-slate-400">{c.customer.salesRecordNo || c.customer.orderId || ''}</span>
                   </div>
                   <Link href={`/cases/${c.id}`} className="text-xs text-slate-400 hover:text-slate-700 shrink-0">
                     View ↗

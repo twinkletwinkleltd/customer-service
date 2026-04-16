@@ -1,21 +1,33 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { extractKeywords } from '@/lib/keywords'
-import type { Message, CustomerInfo } from '@/lib/types'
+import {
+  ACCOUNT_DISPLAY,
+  ACCOUNT_VALUES,
+  CREATOR_VALUES,
+  type Account,
+  type Creator,
+  type CustomerInfo,
+  type Message,
+  type SearchResult,
+} from '@/lib/types'
 import type { NewCaseData } from '@/lib/cases'
 
 const CATEGORIES = ['Product Issue', 'Order & Shipping', 'Refunds & Returns', 'Billing', 'Other']
 
 const EMPTY_CUSTOMER: CustomerInfo = {
-  name: '', address1: '', postcode: '', email: '', orderId: '',
+  name: '', address1: '', postcode: '', email: '', salesRecordNo: '',
 }
 
 export default function NewCasePage() {
   const router = useRouter()
 
   const [customer,   setCustomer]   = useState<CustomerInfo>(EMPTY_CUSTOMER)
+  const [account,    setAccount]    = useState<Account | ''>('')
+  const [creator,    setCreator]    = useState<Creator | ''>('')
   const [sku,        setSku]        = useState('')
   const [messages,   setMessages]   = useState<Message[]>([])
   const [drafts,     setDrafts]     = useState<{ customer: string; agent: string }>({ customer: '', agent: '' })
@@ -27,6 +39,27 @@ export default function NewCasePage() {
   const [status,     setStatus]     = useState<'open' | 'resolved'>('open')
   const [saving,     setSaving]     = useState(false)
   const [error,      setError]      = useState('')
+
+  // Similar-case drawer state
+  const [drawerOpen,    setDrawerOpen]    = useState(false)
+  const [drawerLoading, setDrawerLoading] = useState(false)
+  const [drawerResults, setDrawerResults] = useState<SearchResult[]>([])
+
+  // Try to pre-fill creator from /api/me
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch('/api/me', { cache: 'no-store' })
+        if (!res.ok) return
+        const data = await res.json() as { creator: Creator | null }
+        if (!cancelled && data.creator) setCreator(data.creator)
+      } catch {
+        // Silent — user will pick from dropdown.
+      }
+    })()
+    return () => { cancelled = true }
+  }, [])
 
   function addMessage(role: 'customer' | 'agent') {
     const text = drafts[role].trim()
@@ -47,14 +80,66 @@ export default function NewCasePage() {
     setKwInput('')
   }
 
-  async function handleSave() {
-    if (!customer.name || !sku || !issue || messages.length === 0) {
-      setError('Customer name, SKU, issue summary, and at least one message are required.')
+  async function findSimilar() {
+    const customerText = messages
+      .filter((m) => m.role === 'customer')
+      .map((m) => m.text)
+      .join(' ')
+    const query = [issue, customerText].filter(Boolean).join(' ').trim()
+    if (!query) {
+      setError('Enter an issue summary or at least one customer message to find similar cases.')
       return
     }
+    setDrawerOpen(true)
+    setDrawerLoading(true)
+    try {
+      const res = await fetch('/api/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query,
+          skuHint: sku || undefined,
+          accountHint: account || undefined,
+        }),
+      })
+      const data = await res.json() as SearchResult[]
+      setDrawerResults(Array.isArray(data) ? data : [])
+    } catch {
+      setDrawerResults([])
+    } finally {
+      setDrawerLoading(false)
+    }
+  }
+
+  async function handleSave() {
+    const missing: string[] = []
+    if (!customer.name)          missing.push('Name')
+    if (!customer.salesRecordNo) missing.push('Sales record no.')
+    if (!account)                missing.push('Account')
+    if (!creator)                missing.push('Creator')
+    if (!sku)                    missing.push('SKU')
+    if (!issue)                  missing.push('Issue')
+    if (messages.length === 0)   missing.push('At least one conversation message')
+
+    if (missing.length > 0) {
+      setError(`Required: ${missing.join(', ')}`)
+      return
+    }
+
     setSaving(true)
     setError('')
-    const body: NewCaseData = { customer, standardSku: sku, conversation: messages, category, keywords, issue, resolution, status }
+    const body: NewCaseData = {
+      customer,
+      account: account as Account,
+      creator: creator as Creator,
+      standardSku: sku,
+      conversation: messages,
+      category,
+      keywords,
+      issue,
+      resolution,
+      status,
+    }
     const res = await fetch('/api/cases', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -84,16 +169,46 @@ export default function NewCasePage() {
         {/* Scrollable fields */}
         <div className="flex-1 overflow-y-auto px-6 py-5 flex flex-col gap-5">
 
+          {/* Account + Creator */}
+          <div className="flex gap-3">
+            <div className="flex flex-col gap-1 flex-1">
+              <label className="text-xs text-slate-400">Account <span className="text-red-400">*</span></label>
+              <select
+                value={account}
+                onChange={(e) => setAccount(e.target.value as Account | '')}
+                className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none text-slate-700 bg-white"
+              >
+                <option value="">— Select —</option>
+                {ACCOUNT_VALUES.map((a) => (
+                  <option key={a} value={a}>{ACCOUNT_DISPLAY[a]}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex flex-col gap-1 flex-1">
+              <label className="text-xs text-slate-400">Creator <span className="text-red-400">*</span></label>
+              <select
+                value={creator}
+                onChange={(e) => setCreator(e.target.value as Creator | '')}
+                className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none text-slate-700 bg-white"
+              >
+                <option value="">— Select —</option>
+                {CREATOR_VALUES.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
           {/* Customer */}
           <div className="flex flex-col gap-3">
             <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Customer</p>
             <div className="grid grid-cols-2 gap-3">
               {([
-                { key: 'name',     label: 'Name',     required: true  },
-                { key: 'orderId',  label: 'Order ID', required: true  },
-                { key: 'address1', label: 'Address',  required: false },
-                { key: 'postcode', label: 'Postcode', required: false },
-                { key: 'email',    label: 'Email',    required: false },
+                { key: 'name',          label: 'Name',             required: true  },
+                { key: 'salesRecordNo', label: 'Sales record no.', required: true  },
+                { key: 'address1',      label: 'Address',          required: false },
+                { key: 'postcode',      label: 'Postcode',         required: false },
+                { key: 'email',         label: 'Email',            required: false },
               ] as { key: keyof CustomerInfo; label: string; required: boolean }[]).map(({ key, label, required }) => (
                 <div key={key} className="flex flex-col gap-1">
                   <label className="text-xs text-slate-400">
@@ -101,7 +216,7 @@ export default function NewCasePage() {
                   </label>
                   <input
                     className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                    value={customer[key]}
+                    value={(customer[key] as string | undefined) ?? ''}
                     onChange={(e) => setCustomer({ ...customer, [key]: e.target.value })}
                   />
                 </div>
@@ -130,6 +245,15 @@ export default function NewCasePage() {
               onChange={(e) => setIssue(e.target.value)}
             />
           </div>
+
+          {/* Find Similar */}
+          <button
+            type="button"
+            onClick={findSimilar}
+            className="self-start text-xs font-semibold text-blue-600 border border-blue-200 bg-blue-50 hover:bg-blue-100 rounded-lg px-3 py-1.5 transition-colors"
+          >
+            Find similar / 查找相似案例
+          </button>
 
           {/* Category + Status */}
           <div className="flex gap-3">
@@ -252,13 +376,11 @@ export default function NewCasePage() {
             placeholder="Type or paste a message, then click Add below…"
             value={drafts.customer || drafts.agent}
             onChange={(e) => {
-              // shared textarea — value is used by whichever button is clicked
               setDrafts({ customer: e.target.value, agent: e.target.value })
             }}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault()
-                // default to customer on plain Enter
                 addMessage('customer')
               }
             }}
@@ -287,6 +409,75 @@ export default function NewCasePage() {
           )}
         </div>
       </div>
+
+      {/* ── Similar cases drawer ── */}
+      {drawerOpen && (
+        <div className="fixed inset-0 z-40 flex">
+          <div
+            className="flex-1 bg-slate-900/30"
+            onClick={() => setDrawerOpen(false)}
+            aria-hidden
+          />
+          <aside className="w-[420px] bg-white shadow-xl border-l border-slate-200 flex flex-col">
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-800">Similar cases</h3>
+              <button
+                onClick={() => setDrawerOpen(false)}
+                className="text-slate-400 hover:text-slate-700 text-sm"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-3">
+              {drawerLoading && <p className="text-sm text-slate-400">Searching…</p>}
+              {!drawerLoading && drawerResults.length === 0 && (
+                <p className="text-sm text-slate-400">No similar cases or replies yet.</p>
+              )}
+              {!drawerLoading && drawerResults.map((r, i) => {
+                if (r.type === 'case' && r.case) {
+                  const c = r.case
+                  return (
+                    <Link
+                      key={`case-${c.id}-${i}`}
+                      href={`/cases/${c.id}`}
+                      target="_blank"
+                      className="block bg-white border border-slate-200 hover:border-blue-300 rounded-xl p-3 flex flex-col gap-1 transition-colors"
+                    >
+                      <div className="flex items-center gap-2 text-xs text-slate-400">
+                        <span className="font-mono">{c.id}</span>
+                        <span className="text-slate-300">·</span>
+                        <span className="font-mono">{c.standardSku}</span>
+                        <span className="text-slate-300">·</span>
+                        <span>score {r.score}</span>
+                      </div>
+                      <p className="text-sm font-semibold text-slate-800 leading-snug">{c.issue}</p>
+                      {c.resolution && (
+                        <p className="text-xs text-slate-500 line-clamp-2">{c.resolution}</p>
+                      )}
+                    </Link>
+                  )
+                }
+                if (r.type === 'reply' && r.reply) {
+                  const reply = r.reply
+                  return (
+                    <div
+                      key={`reply-${reply.id}-${i}`}
+                      className="bg-violet-50 border border-violet-100 rounded-xl p-3 flex flex-col gap-1"
+                    >
+                      <div className="text-xs text-violet-500 font-semibold">
+                        Standard reply · score {r.score}
+                      </div>
+                      <p className="text-xs text-slate-500 italic">{reply.question}</p>
+                      <p className="text-sm text-slate-700 leading-snug line-clamp-3">{reply.reply}</p>
+                    </div>
+                  )
+                }
+                return null
+              })}
+            </div>
+          </aside>
+        </div>
+      )}
 
     </div>
   )
