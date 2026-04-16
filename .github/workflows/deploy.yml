@@ -1,0 +1,58 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Prepare SSH key
+        shell: bash
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Deploy on VPS
+        shell: bash
+        run: |
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes \
+              "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" '
+            set -e
+
+            cd /opt/customer-service
+
+            # Pull latest code from customer-service repo.
+            sudo -u portal-system git fetch origin
+            sudo -u portal-system git reset --hard origin/main
+
+            # Backup current .next build (keep last 5).
+            if [ -d .next ]; then
+              SHA=$(git rev-parse --short HEAD)
+              sudo -u portal-system mkdir -p backups
+              sudo -u portal-system cp -r .next "backups/$SHA" 2>/dev/null || true
+              sudo -u portal-system bash -c "ls -t backups 2>/dev/null | tail -n +6 | xargs -I{} rm -rf backups/{}"
+            fi
+
+            # Install dependencies + build.
+            sudo -u portal-system npm install --no-audit --no-fund
+            sudo -u portal-system npm run build
+
+            # Refresh systemd unit from repo (in case it changed).
+            sudo cp deploy/customer-service.service /etc/systemd/system/customer-service.service
+            sudo systemctl daemon-reload
+            sudo systemctl restart customer-service.service
+
+            # Health check — fail deploy if service did not come up.
+            sleep 3
+            sudo systemctl is-active customer-service.service
+            code=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:3001/)
+            echo "customer-service HTTP: ${code}"
+            echo "${code}" | grep -qE "^(200|302|307)$" || \
+              { echo "ERROR: expected 200/302/307, got ${code}"; exit 1; }
+          '
