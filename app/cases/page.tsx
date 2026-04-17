@@ -30,14 +30,14 @@ export default function CasesPage() {
   const [statusFilt, setStatusFilt] = useState('all')
   const [catFilt,    setCatFilt]    = useState('All')
 
-  async function load() {
-    setLoading(true)
-    const res = await fetch(apiPath('/cases'))
-    setCases(await res.json())
-    setLoading(false)
-  }
-
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    fetch(apiPath('/cases'))
+      .then((r) => r.json())
+      .then((data) => {
+        setCases(data)
+        setLoading(false)
+      })
+  }, [])
 
   const filtered = cases.filter((c) => {
     if (statusFilt !== 'all' && c.status !== statusFilt) return false
