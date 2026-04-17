@@ -1,7 +1,7 @@
 // lib/cases.ts
 import fs from 'fs/promises'
 import path from 'path'
-import { readCases, writeCases, getCaseImagesDir } from './persistence'
+import { readCases, writeCases, mutateCases, getCaseImagesDir } from './persistence'
 import type { Attachment, CustomerCase, CasePatch } from './types'
 
 function nextId(cases: CustomerCase[]): string {
@@ -36,38 +36,45 @@ export async function getCaseById(id: string): Promise<CustomerCase | null> {
 export type NewCaseData = Omit<CustomerCase, 'id' | 'createdAt' | 'updatedAt' | 'attachments'>
 
 export async function createCase(data: NewCaseData): Promise<CustomerCase> {
-  const cases = await readCases()
-  const now = new Date().toISOString()
-  const newCase: CustomerCase = {
-    id: nextId(cases),
-    ...data,
-    attachments: [],
-    createdAt: now,
-    updatedAt: now,
-  }
-  await writeCases([...cases, newCase])
-  return newCase
+  let newCase: CustomerCase | null = null
+  await mutateCases((cases) => {
+    const now = new Date().toISOString()
+    newCase = {
+      id: nextId(cases),
+      ...data,
+      attachments: [],
+      createdAt: now,
+      updatedAt: now,
+    }
+    return [...cases, newCase]
+  })
+  return newCase!
 }
 
 export async function patchCase(id: string, patch: CasePatch): Promise<CustomerCase | null> {
-  const cases = await readCases()
-  const idx = cases.findIndex((c) => c.id === id)
-  if (idx === -1) return null
-  const updated: CustomerCase = {
-    ...cases[idx],
-    ...patch,
-    updatedAt: new Date().toISOString(),
-  }
-  cases[idx] = updated
-  await writeCases(cases)
+  let updated: CustomerCase | null = null
+  await mutateCases((cases) => {
+    const idx = cases.findIndex((c) => c.id === id)
+    if (idx === -1) return cases
+    updated = {
+      ...cases[idx],
+      ...patch,
+      updatedAt: new Date().toISOString(),
+    }
+    cases[idx] = updated
+    return cases
+  })
   return updated
 }
 
 export async function deleteCase(id: string): Promise<boolean> {
-  const cases = await readCases()
-  const filtered = cases.filter((c) => c.id !== id)
-  if (filtered.length === cases.length) return false
-  await writeCases(filtered)
+  let removed = false
+  await mutateCases((cases) => {
+    const filtered = cases.filter((c) => c.id !== id)
+    removed = filtered.length !== cases.length
+    return filtered
+  })
+  if (!removed) return false
   // Wipe any stored images for this case. Best-effort: ignore ENOENT.
   const imagesDir = path.join(getCaseImagesDir(), id)
   try {
@@ -94,6 +101,9 @@ export async function addAttachment(
   caseId: string,
   file: AddAttachmentInput,
 ): Promise<Attachment | null> {
+  // Pre-compute attachment ID + write the file to disk first (outside the
+  // lock). The lock only wraps the cases.json read-modify-write, so disk
+  // I/O for the image doesn't block other case mutations.
   const cases = await readCases()
   const idx = cases.findIndex((c) => c.id === caseId)
   if (idx === -1) return null
@@ -118,16 +128,30 @@ export async function addAttachment(
     createdAt: now,
   }
 
-  cases[idx] = {
-    ...cases[idx],
-    attachments: [...existing, att],
-    updatedAt: now,
+  // Now acquire lock and update cases.json
+  let success = false
+  await mutateCases((current) => {
+    const i = current.findIndex((c) => c.id === caseId)
+    if (i === -1) return current
+    const ex = current[i].attachments ?? []
+    current[i] = {
+      ...current[i],
+      attachments: [...ex, att],
+      updatedAt: now,
+    }
+    success = true
+    return current
+  })
+  if (!success) {
+    // Case was deleted during our write — clean up the orphan file
+    try { await fs.unlink(path.join(dir, onDiskName)) } catch { /* ignore */ }
+    return null
   }
-  await writeCases(cases)
   return att
 }
 
 export async function removeAttachment(caseId: string, attId: string): Promise<boolean> {
+  // Read once outside lock to find the disk file path
   const cases = await readCases()
   const idx = cases.findIndex((c) => c.id === caseId)
   if (idx === -1) return false
@@ -142,13 +166,22 @@ export async function removeAttachment(caseId: string, attId: string): Promise<b
     // Ignore missing-file errors; still clean up metadata.
   }
 
-  cases[idx] = {
-    ...cases[idx],
-    attachments: existing.filter((a) => a.id !== attId),
-    updatedAt: new Date().toISOString(),
-  }
-  await writeCases(cases)
-  return true
+  let removed = false
+  await mutateCases((current) => {
+    const i = current.findIndex((c) => c.id === caseId)
+    if (i === -1) return current
+    const ex = current[i].attachments ?? []
+    const next = ex.filter((a) => a.id !== attId)
+    if (next.length === ex.length) return current
+    current[i] = {
+      ...current[i],
+      attachments: next,
+      updatedAt: new Date().toISOString(),
+    }
+    removed = true
+    return current
+  })
+  return removed
 }
 
 export async function getAttachment(

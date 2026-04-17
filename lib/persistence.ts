@@ -46,6 +46,44 @@ async function ensureDir(dir: string): Promise<void> {
   await fs.mkdir(dir, { recursive: true })
 }
 
+// ─── Atomic write helper (crash-safe) ─────────────────────────────────────
+//
+// fs.writeFile on the target path can leave a half-written file if the
+// process dies mid-write. We write to a temp file in the same directory
+// then rename — rename is atomic on POSIX and Windows for files in the
+// same filesystem.
+async function atomicWriteJson(file: string, data: unknown): Promise<void> {
+  const tmp = `${file}.${process.pid}.${Date.now()}.tmp`
+  await fs.writeFile(tmp, JSON.stringify(data, null, 2), 'utf-8')
+  await fs.rename(tmp, file)
+}
+
+// ─── In-process mutex (lost-update protection) ─────────────────────────────
+//
+// All read-modify-write flows on cases.json must use `withCasesLock` so that
+// two concurrent saves can't overwrite each other. A single Node.js process
+// is single-threaded for JS, but `await` between read and write opens a
+// window where another request can interleave. The mutex serialises that
+// critical section.
+//
+// Customer-service runs as ONE Node process (port 3001). Multi-process
+// clustering would need a real lockfile (e.g. `proper-lockfile`).
+let casesLockPromise: Promise<void> = Promise.resolve()
+
+export async function withCasesLock<T>(fn: () => Promise<T>): Promise<T> {
+  const previous = casesLockPromise
+  let release!: () => void
+  casesLockPromise = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  await previous
+  try {
+    return await fn()
+  } finally {
+    release()
+  }
+}
+
 // ─── Cases ────────────────────────────────────────────────────────────────
 
 export async function readCases(): Promise<CustomerCase[]> {
@@ -63,7 +101,28 @@ export async function readCases(): Promise<CustomerCase[]> {
 
 export async function writeCases(cases: CustomerCase[]): Promise<void> {
   await ensureDir(getCustomerServiceDir())
-  await fs.writeFile(getCasesFile(), JSON.stringify(cases, null, 2), 'utf-8')
+  await atomicWriteJson(getCasesFile(), cases)
+}
+
+/**
+ * Read-modify-write helper: load cases, apply mutator, save atomically,
+ * all inside the cases-lock. Use this from API routes that mutate cases.
+ *
+ * Example:
+ *   await mutateCases(cases => {
+ *     cases.push(newCase)
+ *     return cases
+ *   })
+ */
+export async function mutateCases(
+  mutator: (cases: CustomerCase[]) => CustomerCase[] | Promise<CustomerCase[]>,
+): Promise<CustomerCase[]> {
+  return withCasesLock(async () => {
+    const current = await readCases()
+    const next = await mutator(current)
+    await writeCases(next)
+    return next
+  })
 }
 
 // ─── Standard Replies ────────────────────────────────────────────────────
@@ -97,5 +156,5 @@ export async function readReplies(): Promise<StandardReply[]> {
 
 export async function writeReplies(replies: StandardReply[]): Promise<void> {
   await ensureDir(getCustomerServiceDir())
-  await fs.writeFile(getRepliesFile(), JSON.stringify(replies, null, 2), 'utf-8')
+  await atomicWriteJson(getRepliesFile(), replies)
 }
