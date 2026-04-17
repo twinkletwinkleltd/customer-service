@@ -7,12 +7,12 @@ const __dirname_esm = path.dirname(fileURLToPath(import.meta.url))
 export default defineConfig({
   test: {
     environment: 'node',
-    include: ['lib/**/*.test.ts'],
+    include: ['lib/**/*.test.ts', 'app/**/*.test.ts'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],
       include: ['lib/**/*.ts'],
-      exclude: ['lib/**/*.test.ts', 'lib/types.ts'],
+      exclude: ['lib/**/*.test.ts', 'lib/types.ts', 'app/**/*.test.ts', 'app/api/_test-helpers.ts'],
       thresholds: {
         lines: 70,
         branches: 70,
