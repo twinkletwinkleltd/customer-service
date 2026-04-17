@@ -31,12 +31,14 @@ jobs:
             sudo -u portal-system git fetch origin
             sudo -u portal-system git reset --hard origin/main
 
-            # Backup current .next build (keep last 5).
+            # Backup current .next build outside the project tree (keep last 5).
+            BACKUP_DIR=/opt/deploy-backups/customer-service
+            sudo mkdir -p "$BACKUP_DIR"
+            sudo chown portal-system:portal-system "$BACKUP_DIR"
             if [ -d .next ]; then
               SHA=$(git rev-parse --short HEAD)
-              sudo -u portal-system mkdir -p backups
-              sudo -u portal-system cp -r .next "backups/$SHA" 2>/dev/null || true
-              sudo -u portal-system bash -c "ls -t backups 2>/dev/null | tail -n +6 | xargs -I{} rm -rf backups/{}"
+              sudo -u portal-system cp -r .next "$BACKUP_DIR/$SHA" 2>/dev/null || true
+              sudo -u portal-system bash -c "ls -t \"$BACKUP_DIR\" 2>/dev/null | tail -n +6 | xargs -r -I{} rm -rf \"$BACKUP_DIR/{}\""
             fi
 
             # Install dependencies + build.
