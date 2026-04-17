@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { apiPath } from '@/lib/api-path'
 import { extractKeywords } from '@/lib/keywords'
 import {
   ACCOUNT_DISPLAY,
@@ -15,6 +16,19 @@ import {
   type SearchResult,
 } from '@/lib/types'
 import type { NewCaseData } from '@/lib/cases'
+
+// Pending image staged client-side before the case is created.
+type PendingImage = {
+  id: string           // local uid, unrelated to server-issued attachment id
+  file: File
+  previewUrl: string   // object URL for local preview
+}
+
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024
+const ACCEPTED_IMAGE_MIMES = [
+  'image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif',
+]
+const ACCEPTED_IMAGE_EXT_RE = /\.(jpe?g|png|webp|gif)$/i
 
 const CATEGORIES = ['Product Issue', 'Order & Shipping', 'Refunds & Returns', 'Billing', 'Other']
 
@@ -45,12 +59,25 @@ export default function NewCasePage() {
   const [drawerLoading, setDrawerLoading] = useState(false)
   const [drawerResults, setDrawerResults] = useState<SearchResult[]>([])
 
+  // Pending images (uploaded after the case row is created)
+  const [pendingImages, setPendingImages] = useState<PendingImage[]>([])
+  const [imageError,    setImageError]    = useState('')
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
+
+  // Revoke object URLs on unmount to avoid leaks.
+  useEffect(() => {
+    return () => {
+      for (const img of pendingImages) URL.revokeObjectURL(img.previewUrl)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   // Try to pre-fill creator from /api/me
   useEffect(() => {
     let cancelled = false
     ;(async () => {
       try {
-        const res = await fetch('/api/me', { cache: 'no-store' })
+        const res = await fetch(apiPath('/me'), { cache: 'no-store' })
         if (!res.ok) return
         const data = await res.json() as { creator: Creator | null }
         if (!cancelled && data.creator) setCreator(data.creator)
@@ -93,7 +120,7 @@ export default function NewCasePage() {
     setDrawerOpen(true)
     setDrawerLoading(true)
     try {
-      const res = await fetch('/api/search', {
+      const res = await fetch(apiPath('/search'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -109,6 +136,41 @@ export default function NewCasePage() {
     } finally {
       setDrawerLoading(false)
     }
+  }
+
+  function addImages(files: FileList | null) {
+    if (!files || files.length === 0) return
+    setImageError('')
+    const accepted: PendingImage[] = []
+    const rejected: string[] = []
+    for (const file of Array.from(files)) {
+      const mimeOk = ACCEPTED_IMAGE_MIMES.includes(file.type.toLowerCase()) ||
+                     ACCEPTED_IMAGE_EXT_RE.test(file.name)
+      if (!mimeOk) {
+        rejected.push(`${file.name} (type)`)
+        continue
+      }
+      if (file.size > MAX_IMAGE_BYTES) {
+        rejected.push(`${file.name} (>5MB)`)
+        continue
+      }
+      accepted.push({
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        file,
+        previewUrl: URL.createObjectURL(file),
+      })
+    }
+    if (accepted.length > 0) setPendingImages((prev) => [...prev, ...accepted])
+    if (rejected.length > 0) setImageError(`Skipped: ${rejected.join(', ')}`)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  function removePendingImage(id: string) {
+    setPendingImages((prev) => {
+      const target = prev.find((p) => p.id === id)
+      if (target) URL.revokeObjectURL(target.previewUrl)
+      return prev.filter((p) => p.id !== id)
+    })
   }
 
   async function handleSave() {
@@ -140,7 +202,7 @@ export default function NewCasePage() {
       resolution,
       status,
     }
-    const res = await fetch('/api/cases', {
+    const res = await fetch(apiPath('/cases'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -151,7 +213,33 @@ export default function NewCasePage() {
       setSaving(false)
       return
     }
-    const created = await res.json()
+    const created = await res.json() as { id: string }
+
+    // Upload any pending images. Partial failures are tolerated — we still
+    // navigate to the detail page so the user can see what succeeded.
+    const failedUploads: string[] = []
+    if (pendingImages.length > 0) {
+      for (const img of pendingImages) {
+        try {
+          const fd = new FormData()
+          fd.append('file', img.file)
+          const upRes = await fetch(
+            apiPath(`/cases/${created.id}/attachments`),
+            { method: 'POST', body: fd },
+          )
+          if (!upRes.ok) failedUploads.push(img.file.name)
+        } catch {
+          failedUploads.push(img.file.name)
+        }
+      }
+      if (failedUploads.length > 0) {
+        setError(
+          `Case saved, but ${failedUploads.length} image upload(s) failed: ` +
+          failedUploads.join(', '),
+        )
+      }
+    }
+
     router.push(`/cases/${created.id}`)
   }
 
@@ -303,6 +391,59 @@ export default function NewCasePage() {
               />
               <button onClick={addKeyword} className="text-xs text-blue-500 hover:text-blue-700 font-medium">Add</button>
             </div>
+          </div>
+
+          {/* Images / Attachments */}
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                Images / Attachments
+              </p>
+              <span className="text-xs text-slate-400">{pendingImages.length}</span>
+            </div>
+
+            {pendingImages.length === 0 ? (
+              <p className="text-xs text-slate-400">No images staged yet.</p>
+            ) : (
+              <div className="grid grid-cols-3 gap-2">
+                {pendingImages.map((img) => (
+                  <div
+                    key={img.id}
+                    className="relative group border border-slate-200 rounded-lg overflow-hidden bg-slate-50"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={img.previewUrl}
+                      alt={img.file.name}
+                      title={img.file.name}
+                      className="block w-full h-24 object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removePendingImage(img.id)}
+                      className="absolute top-1 right-1 bg-white/90 text-red-500 border border-red-200 rounded-full w-6 h-6 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                      title="Remove image"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <label className="mt-1 inline-flex items-center gap-2 text-xs font-semibold text-blue-600 border border-blue-200 bg-blue-50 hover:bg-blue-100 rounded-lg px-3 py-1.5 cursor-pointer transition-colors self-start">
+              + Add image
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
+                multiple
+                className="hidden"
+                onChange={(e) => addImages(e.target.files)}
+              />
+            </label>
+            <p className="text-[10px] text-slate-400">jpg, jpeg, png, webp, gif · max 5 MB each · uploaded after save</p>
+            {imageError && <p className="text-xs text-red-500">{imageError}</p>}
           </div>
 
           {/* Resolution */}

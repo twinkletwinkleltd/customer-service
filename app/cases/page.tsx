@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { apiPath } from '@/lib/api-path'
 import type { CustomerCase } from '@/lib/types'
 import { ACCOUNT_DISPLAY } from '@/lib/types'
 
@@ -31,7 +32,7 @@ export default function CasesPage() {
 
   async function load() {
     setLoading(true)
-    const res = await fetch('/api/cases')
+    const res = await fetch(apiPath('/cases'))
     setCases(await res.json())
     setLoading(false)
   }

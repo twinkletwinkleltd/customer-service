@@ -14,12 +14,12 @@ export function isAccount(value: unknown): value is Account {
   return value === 'gorble' || value === 'ssys' || value === 'ama_tktk'
 }
 
-export type Creator = 'star001' | 'star002'
+export type Creator = 'star001' | 'star002' | 'star003'
 
-export const CREATOR_VALUES: Creator[] = ['star001', 'star002']
+export const CREATOR_VALUES: Creator[] = ['star001', 'star002', 'star003']
 
 export function isCreator(value: unknown): value is Creator {
-  return value === 'star001' || value === 'star002'
+  return value === 'star001' || value === 'star002' || value === 'star003'
 }
 
 export interface Message {

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import { apiPath } from '@/lib/api-path'
 import type { Attachment, CustomerCase } from '@/lib/types'
 import { ACCOUNT_DISPLAY } from '@/lib/types'
 
@@ -39,7 +40,7 @@ export default function CaseDetailPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   async function load() {
-    const res = await fetch(`/api/cases/${id}`)
+    const res = await fetch(apiPath(`/cases/${id}`))
     if (!res.ok) { router.push('/cases'); return }
     const data: CustomerCase = await res.json()
     setC(data)
@@ -53,7 +54,7 @@ export default function CaseDetailPage() {
 
   async function handleSave() {
     setSaving(true)
-    await fetch(`/api/cases/${id}`, {
+    await fetch(apiPath(`/cases/${id}`), {
       method:  'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({ resolution, status, category }),
@@ -66,7 +67,7 @@ export default function CaseDetailPage() {
 
   async function handleDelete() {
     if (!confirm('Delete this case? This cannot be undone.')) return
-    await fetch(`/api/cases/${id}`, { method: 'DELETE' })
+    await fetch(apiPath(`/cases/${id}`), { method: 'DELETE' })
     router.push('/cases')
   }
 
@@ -78,7 +79,7 @@ export default function CaseDetailPage() {
     try {
       const fd = new FormData()
       fd.append('file', file)
-      const res = await fetch(`/api/cases/${id}/attachments`, { method: 'POST', body: fd })
+      const res = await fetch(apiPath(`/cases/${id}/attachments`), { method: 'POST', body: fd })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
         setUploadErr(data.error ?? `Upload failed (${res.status})`)
@@ -95,7 +96,7 @@ export default function CaseDetailPage() {
 
   async function handleDeleteAttachment(att: Attachment) {
     if (!confirm(`Delete attachment "${att.originalName}"?`)) return
-    const res = await fetch(`/api/cases/${id}/attachments/${att.id}`, { method: 'DELETE' })
+    const res = await fetch(apiPath(`/cases/${id}/attachments/${att.id}`), { method: 'DELETE' })
     if (res.ok) await load()
   }
 
@@ -223,7 +224,7 @@ export default function CaseDetailPage() {
             ) : (
               <div className="grid grid-cols-3 gap-2">
                 {attachments.map((a) => {
-                  const url = `/api/cases/${c.id}/attachments/${a.id}`
+                  const url = apiPath(`/cases/${c.id}/attachments/${a.id}`)
                   return (
                     <div key={a.id} className="relative group border border-slate-200 rounded-lg overflow-hidden bg-slate-50">
                       <a href={url} target="_blank" rel="noreferrer" title={a.originalName}>

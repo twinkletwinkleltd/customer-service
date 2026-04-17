@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
+import { apiPath } from '@/lib/api-path'
 import type { CustomerCase } from '@/lib/types'
 
 export default function SidebarClient() {
@@ -10,7 +11,7 @@ export default function SidebarClient() {
   const [cases, setCases] = useState<CustomerCase[]>([])
 
   useEffect(() => {
-    fetch('/api/cases')
+    fetch(apiPath('/cases'))
       .then((r) => r.json())
       .then(setCases)
       .catch(() => {})
