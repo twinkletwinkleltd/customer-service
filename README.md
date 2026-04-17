@@ -1,36 +1,62 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Customer Service
 
-## Getting Started
+Internal case-tracking + keyword-search tool for Twinkle Twinkle Ltd support reps.
+Lives under `ordercleaner.twinkletwinkle.uk/customer-service/`, mounted as a
+standalone Next.js 16.2 app on port `3001` behind the portal's nginx.
 
-First, run the development server:
+Users: the four portal users (`star000..star003`). Anyone else is blocked at
+the middleware layer (see `middleware.ts` + ADR-002).
+
+## Quick start
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev        # http://localhost:3000/customer-service
+
+# build for production
+npm run build
+npm run start      # http://localhost:3000/customer-service
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Local dev bypasses the SSO check when `NEXT_PUBLIC_DEV_BYPASS_AUTH=true` is
+set in `.env.local`. Without that flag the app redirects everything to
+`/login` because the `X-Portal-User` header nginx injects in prod isn't
+present locally.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Data lands under `PORTAL_DATA_ROOT/customer-service/`:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```
+cases.json          # CustomerCase[]
+replies.json        # StandardReply[] (auto-seeded on first read)
+case-images/<caseId>/<attId>.<ext>
+```
 
-## Learn More
+If `PORTAL_DATA_ROOT` is unset, `lib/persistence.ts` falls back to the shared
+portal default and finally to `./data` in the repo.
 
-To learn more about Next.js, take a look at the following resources:
+## Where to read more
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- [`docs/product.md`](docs/product.md) — what CS is, who uses it, what it
+  deliberately doesn't do.
+- [`docs/architecture.md`](docs/architecture.md) — C4 context / container /
+  component diagrams + sequence diagram + deployment topology.
+- [`docs/design.md`](docs/design.md) — full API schema, HTTP status code map,
+  auth, validation caps, performance budget, persistence model.
+- [`docs/decisions/`](docs/decisions/) — 7 ADRs covering every non-obvious
+  design call (JSON over SQLite, passive auth header, in-process mutex,
+  atomic tmp+rename, deterministic search, basePath, filesystem attachments).
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Deploy
 
-## Deploy on Vercel
+Deploys are automated via [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml):
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+1. Push to `main` on this submodule.
+2. GitHub Actions SSHes to the VPS.
+3. VPS runs `git pull` in `/opt/portal-system/apps/customer-service/`,
+   `npm ci`, `npm run build`, and `systemctl restart customer-service`.
+4. Next.js serves in standalone mode on `127.0.0.1:3001`; nginx proxies
+   `/customer-service/*` through.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+The deploy shape matches `ama-listing-creator`: one systemd unit per app,
+nginx `location` block per app, shared `PORTAL_DATA_ROOT`, basePath baked
+into `next.config.ts`.
