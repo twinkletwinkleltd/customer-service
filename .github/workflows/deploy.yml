@@ -42,8 +42,8 @@ jobs:
             fi
 
             # Install dependencies from lockfile + build.
-            sudo -u portal-system npm ci --no-audit --no-fund
-            sudo -u portal-system npm run build
+            sudo -u portal-system env HOME="$PWD" NPM_CONFIG_CACHE="$PWD/.npm-cache" npm ci --no-audit --no-fund
+            sudo -u portal-system env HOME="$PWD" NPM_CONFIG_CACHE="$PWD/.npm-cache" npm run build
 
             # Refresh systemd unit from repo (in case it changed).
             sudo cp deploy/customer-service.service /etc/systemd/system/customer-service.service
