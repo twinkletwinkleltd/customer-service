@@ -41,8 +41,8 @@ jobs:
               sudo -u portal-system bash -c "ls -t \"$BACKUP_DIR\" 2>/dev/null | tail -n +6 | xargs -r -I{} rm -rf \"$BACKUP_DIR/{}\""
             fi
 
-            # Install dependencies + build.
-            sudo -u portal-system npm install --no-audit --no-fund
+            # Install dependencies from lockfile + build.
+            sudo -u portal-system npm ci --no-audit --no-fund
             sudo -u portal-system npm run build
 
             # Refresh systemd unit from repo (in case it changed).
