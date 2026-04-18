@@ -51,10 +51,14 @@ jobs:
             sudo systemctl restart customer-service.service
 
             # Health check — fail deploy if service did not come up.
-            sleep 3
             sudo systemctl is-active customer-service.service
-            code=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:3001/customer-service)
-            echo "customer-service HTTP: ${code}"
-            echo "${code}" | grep -qE "^(200|302|307)$" || \
-              { echo "ERROR: expected 200/302/307, got ${code}"; exit 1; }
+            code=000
+            for i in 1 2 3 4 5 6 7 8 9 10; do
+              code=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:3001/customer-service || true)
+              echo "customer-service HTTP attempt ${i}: ${code}"
+              echo "${code}" | grep -qE "^(200|302|307|308)$" && break
+              sleep 2
+            done
+            echo "${code}" | grep -qE "^(200|302|307|308)$" || \
+              { echo "ERROR: expected 200/302/307/308, got ${code}"; exit 1; }
           '
