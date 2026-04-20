@@ -1,14 +1,15 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { Suspense, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { apiPath } from '@/lib/api-path'
 import { extractKeywords } from '@/lib/keywords'
 import {
   ACCOUNT_DISPLAY,
   ACCOUNT_VALUES,
   CREATOR_VALUES,
+  isAccount,
   type Account,
   type Creator,
   type CustomerInfo,
@@ -32,20 +33,43 @@ const ACCEPTED_IMAGE_EXT_RE = /\.(jpe?g|png|webp|gif)$/i
 
 const CATEGORIES = ['Product Issue', 'Order & Shipping', 'Refunds & Returns', 'Billing', 'Other']
 
-const EMPTY_CUSTOMER: CustomerInfo = {
-  name: '', address1: '', postcode: '', email: '', salesRecordNo: '',
+export default function NewCasePage() {
+  // useSearchParams requires a Suspense boundary in Next 15/16 app router.
+  return (
+    <Suspense fallback={<div className="p-8 text-sm text-slate-400">Loading…</div>}>
+      <NewCasePageInner />
+    </Suspense>
+  )
 }
 
-export default function NewCasePage() {
-  const router = useRouter()
+function NewCasePageInner() {
+  const router       = useRouter()
+  const searchParams = useSearchParams()
 
-  const [customer,   setCustomer]   = useState<CustomerInfo>(EMPTY_CUSTOMER)
-  const [account,    setAccount]    = useState<Account | ''>('')
+  // Compute pre-fill values from URL query params on first render so the
+  // state initialiser runs synchronously (no flash of blank form). Missing
+  // params leave their field empty.
+  const prefillAccount  = (() => {
+    const v = searchParams?.get('account')
+    return v && isAccount(v) ? (v as Account) : ''
+  })()
+  const prefillCustomer: CustomerInfo = {
+    name:          searchParams?.get('buyerName')     ?? '',
+    address1:      '',
+    postcode:      searchParams?.get('buyerPostcode') ?? '',
+    email:         searchParams?.get('buyerEmail')    ?? '',
+    salesRecordNo: searchParams?.get('salesRecordNo') ?? '',
+  }
+  const prefillSku       = searchParams?.get('sku')       ?? ''
+  const prefillIssueTitle = searchParams?.get('itemTitle') ?? ''
+
+  const [customer,   setCustomer]   = useState<CustomerInfo>(prefillCustomer)
+  const [account,    setAccount]    = useState<Account | ''>(prefillAccount)
   const [creator,    setCreator]    = useState<Creator | ''>('')
-  const [sku,        setSku]        = useState('')
+  const [sku,        setSku]        = useState(prefillSku)
   const [messages,   setMessages]   = useState<Message[]>([])
   const [drafts,     setDrafts]     = useState<{ customer: string; agent: string }>({ customer: '', agent: '' })
-  const [issue,      setIssue]      = useState('')
+  const [issue,      setIssue]      = useState(prefillIssueTitle)
   const [category,   setCategory]   = useState(CATEGORIES[0])
   const [keywords,   setKeywords]   = useState<string[]>([])
   const [kwInput,    setKwInput]    = useState('')

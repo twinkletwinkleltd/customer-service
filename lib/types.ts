@@ -1,17 +1,23 @@
 // lib/types.ts
 
-export type Account = 'gorble' | 'ssys' | 'ama_tktk'
+export type Account = 'gorble' | 'ssys' | 'ama_tktk' | 'shopify'
 
 export const ACCOUNT_DISPLAY: Record<Account, string> = {
   gorble:   'Gorble',
   ssys:     'SSYS',
   ama_tktk: 'Ama-TKTK',
+  shopify:  'Shopify',
 }
 
-export const ACCOUNT_VALUES: Account[] = ['gorble', 'ssys', 'ama_tktk']
+export const ACCOUNT_VALUES: Account[] = ['gorble', 'ssys', 'ama_tktk', 'shopify']
 
 export function isAccount(value: unknown): value is Account {
-  return value === 'gorble' || value === 'ssys' || value === 'ama_tktk'
+  return (
+    value === 'gorble' ||
+    value === 'ssys' ||
+    value === 'ama_tktk' ||
+    value === 'shopify'
+  )
 }
 
 export type Creator = 'star001' | 'star002' | 'star003'

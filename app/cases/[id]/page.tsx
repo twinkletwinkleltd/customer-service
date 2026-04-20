@@ -5,6 +5,11 @@ import { useParams, useRouter } from 'next/navigation'
 import { apiPath } from '@/lib/api-path'
 import type { Attachment, CustomerCase } from '@/lib/types'
 import { ACCOUNT_DISPLAY } from '@/lib/types'
+import {
+  customerLookupUrl,
+  extractEbayUsername,
+  portraitUrl as buildPortraitUrl,
+} from '@/lib/portal-links'
 
 const CATEGORIES = ['Product Issue', 'Order & Shipping', 'Refunds & Returns', 'Billing', 'Other']
 
@@ -17,6 +22,8 @@ const ACCOUNT_COLORS: Record<string, string> = {
   gorble:   'bg-purple-50 text-purple-700 border border-purple-200',
   ssys:     'bg-blue-50 text-blue-700 border border-blue-200',
   ama_tktk: 'bg-orange-50 text-orange-700 border border-orange-200',
+  // Shopify brand green (#95BF47)
+  shopify:  'bg-lime-50 text-lime-700 border border-lime-200',
 }
 
 function salesNo(c: CustomerCase): string {
@@ -103,7 +110,10 @@ export default function CaseDetailPage() {
   if (loading) return <div className="p-8 text-sm text-slate-400">Loading…</div>
   if (!c)      return <div className="p-8 text-sm text-slate-400">Case not found.</div>
 
-  const attachments = c.attachments ?? []
+  const attachments  = c.attachments ?? []
+  const ebayUsername = extractEbayUsername(c.customer.email)
+  const portraitUrl  = buildPortraitUrl(ebayUsername)
+  const lookupUrl    = customerLookupUrl(c.customer.email)
 
   return (
     <div className="flex h-full min-h-screen">
@@ -264,6 +274,34 @@ export default function CaseDetailPage() {
           </div>
 
         </div>
+
+        {/* Customer deep-links (portal) */}
+        {(portraitUrl || lookupUrl) && (
+          <div className="px-6 py-3 border-t border-slate-100 flex flex-wrap gap-2">
+            {portraitUrl && (
+              <a
+                href={portraitUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs font-semibold text-slate-600 border border-slate-200 bg-white hover:bg-slate-50 rounded-lg px-3 py-1.5 transition-colors"
+                title="Open customer portrait in portal"
+              >
+                查看客户画像 · View Customer Portrait
+              </a>
+            )}
+            {lookupUrl && (
+              <a
+                href={lookupUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs font-semibold text-slate-600 border border-slate-200 bg-white hover:bg-slate-50 rounded-lg px-3 py-1.5 transition-colors"
+                title="Search this email in Customer Lookup"
+              >
+                查看 Customer Lookup 详情
+              </a>
+            )}
+          </div>
+        )}
 
         {/* Sticky action bar */}
         <div className="px-6 py-4 border-t border-slate-100 flex gap-3 items-center">

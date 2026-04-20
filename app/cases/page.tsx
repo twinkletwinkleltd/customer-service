@@ -15,6 +15,8 @@ const ACCOUNT_COLORS: Record<string, string> = {
   gorble:   'bg-purple-50 text-purple-700',
   ssys:     'bg-blue-50 text-blue-700',
   ama_tktk: 'bg-orange-50 text-orange-700',
+  // Shopify brand green (#95BF47) — tailwind lime/green tint
+  shopify:  'bg-lime-50 text-lime-700',
 }
 
 const CATEGORIES = ['All', 'Product Issue', 'Order & Shipping', 'Refunds & Returns', 'Billing', 'Other']
