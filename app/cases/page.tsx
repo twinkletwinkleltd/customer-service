@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { apiPath } from '@/lib/api-path'
 import type { CustomerCase } from '@/lib/types'
 import { ACCOUNT_DISPLAY } from '@/lib/types'
@@ -26,6 +27,7 @@ function salesNo(c: CustomerCase): string {
 }
 
 export default function CasesPage() {
+  const router = useRouter()
   const [cases,      setCases]      = useState<CustomerCase[]>([])
   const [loading,    setLoading]    = useState(true)
   const [search,     setSearch]     = useState('')
@@ -156,7 +158,7 @@ export default function CasesPage() {
                 <tr
                   key={c.id}
                   className="hover:bg-slate-50 transition-colors cursor-pointer"
-                  onClick={() => window.location.href = `/cases/${c.id}`}
+                  onClick={() => router.push(`/cases/${c.id}`)}
                 >
                   <td className="px-5 py-3.5 font-mono text-xs text-slate-400">{c.id}</td>
                   <td className="px-5 py-3.5">
