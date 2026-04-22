@@ -6,7 +6,7 @@ export const ACCOUNT_DISPLAY: Record<Account, string> = {
   gorble:   'Gorble',
   ssys:     'SSYS',
   ama_tktk: 'Ama-TKTK',
-  shopify:  'Shopify',
+  shopify:  'TKTK Shopify',
 }
 
 export const ACCOUNT_VALUES: Account[] = ['gorble', 'ssys', 'ama_tktk', 'shopify']

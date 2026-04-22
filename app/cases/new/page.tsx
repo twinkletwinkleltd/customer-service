@@ -55,13 +55,22 @@ function NewCasePageInner() {
   })()
   const prefillCustomer: CustomerInfo = {
     name:          searchParams?.get('buyerName')     ?? '',
-    address1:      '',
+    // ``address`` query param (Plan 7 Shopify) → address1 fallback when
+    // upstream caller wants to pass a single-line concatenated address.
+    address1:      searchParams?.get('address')        ?? '',
     postcode:      searchParams?.get('buyerPostcode') ?? '',
-    email:         searchParams?.get('buyerEmail')    ?? '',
+    // Accept both ``buyerEmail`` (legacy) and ``email`` (Plan 7) spellings.
+    email:         searchParams?.get('buyerEmail')
+                    ?? searchParams?.get('email')
+                    ?? '',
     salesRecordNo: searchParams?.get('salesRecordNo') ?? '',
   }
   const prefillSku       = searchParams?.get('sku')       ?? ''
-  const prefillIssueTitle = searchParams?.get('itemTitle') ?? ''
+  // ``itemTitle`` (legacy) + ``issue`` (Plan 7 Shopify) both populate the
+  // issue summary textarea.
+  const prefillIssueTitle = searchParams?.get('itemTitle')
+                              ?? searchParams?.get('issue')
+                              ?? ''
 
   const [customer,   setCustomer]   = useState<CustomerInfo>(prefillCustomer)
   const [account,    setAccount]    = useState<Account | ''>(prefillAccount)
