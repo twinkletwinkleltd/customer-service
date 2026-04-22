@@ -46,6 +46,13 @@ export default function CaseDetailPage() {
   const [uploadErr, setUploadErr] = useState('')
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
+  // Danger-zone delete state
+  const [dangerOpen,    setDangerOpen]    = useState(false)
+  const [deleteOpen,    setDeleteOpen]    = useState(false)
+  const [deletePassword,setDeletePassword]= useState('')
+  const [deleting,      setDeleting]      = useState(false)
+  const [deleteErr,     setDeleteErr]     = useState('')
+
   async function load() {
     const res = await fetch(apiPath(`/cases/${id}`))
     if (!res.ok) { router.push('/cases'); return }
@@ -72,10 +79,34 @@ export default function CaseDetailPage() {
     setTimeout(() => setSaved(false), 2000)
   }
 
-  async function handleDelete() {
-    if (!confirm('Delete this case? This cannot be undone.')) return
-    await fetch(apiPath(`/cases/${id}`), { method: 'DELETE' })
-    router.push('/cases')
+  async function handleDeleteSubmit() {
+    if (!deletePassword) {
+      setDeleteErr('Password required')
+      return
+    }
+    setDeleting(true)
+    setDeleteErr('')
+    try {
+      const res = await fetch(apiPath(`/cases/${id}`), {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: deletePassword }),
+      })
+      if (res.status === 204) {
+        router.push('/cases')
+        return
+      }
+      const data = await res.json().catch(() => ({}))
+      if (res.status === 401)      setDeleteErr(data.error ?? 'Login required')
+      else if (res.status === 400) setDeleteErr(data.error ?? 'Password required')
+      else if (res.status === 403) setDeleteErr(data.error ?? 'Incorrect password')
+      else if (res.status === 404) setDeleteErr(data.error ?? 'Case not found')
+      else                         setDeleteErr(data.error ?? `Delete failed (${res.status})`)
+    } catch (err) {
+      setDeleteErr((err as Error).message)
+    } finally {
+      setDeleting(false)
+    }
   }
 
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -303,6 +334,31 @@ export default function CaseDetailPage() {
           </div>
         )}
 
+        {/* Danger zone (collapsed by default) */}
+        <div className="px-6 py-3 border-t border-slate-100">
+          <button
+            type="button"
+            onClick={() => setDangerOpen(o => !o)}
+            className="text-xs text-slate-400 hover:text-slate-600 transition-colors"
+          >
+            {dangerOpen ? '收起 / Collapse' : 'More actions / 更多操作'}
+          </button>
+          {dangerOpen && (
+            <div className="mt-2 border border-red-200 rounded-lg p-3 bg-red-50/40">
+              <div className="text-xs font-semibold text-red-700 mb-2">
+                Danger zone / 危险操作
+              </div>
+              <button
+                type="button"
+                onClick={() => { setDeleteErr(''); setDeletePassword(''); setDeleteOpen(true) }}
+                className="text-xs font-semibold text-red-700 border border-red-300 bg-white hover:bg-red-100 rounded-lg px-3 py-1.5 transition-colors"
+              >
+                Delete this case / 删除此 Case
+              </button>
+            </div>
+          )}
+        </div>
+
         {/* Sticky action bar */}
         <div className="px-6 py-4 border-t border-slate-100 flex gap-3 items-center">
           <button
@@ -319,15 +375,60 @@ export default function CaseDetailPage() {
           >
             Find Similar
           </button>
-          <button
-            onClick={handleDelete}
-            className="text-red-400 hover:text-red-600 text-sm px-2 py-2.5 transition-colors"
-            title="Delete case"
-          >
-            ✕
-          </button>
         </div>
       </div>
+
+      {/* Delete confirmation modal */}
+      {deleteOpen && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center px-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+            <h3 className="text-base font-bold text-red-700 mb-3">
+              Delete this case? / 删除此 Case?
+            </h3>
+            <div className="text-xs text-slate-600 space-y-1 mb-4">
+              <div><span className="text-slate-400">Case ID:</span> {c.id}</div>
+              <div><span className="text-slate-400">Customer:</span> {c.customer.name || '—'}</div>
+              <div><span className="text-slate-400">Issue:</span> {c.issue || '—'}</div>
+            </div>
+            <div className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg p-2 mb-4">
+              ⚠ Deletion is irreversible / 删除后不可恢复
+            </div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
+              Enter your portal password to confirm / 输入你的 portal 密码确认
+            </label>
+            <input
+              type="password"
+              value={deletePassword}
+              onChange={e => setDeletePassword(e.target.value)}
+              autoFocus
+              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm mb-2"
+              disabled={deleting}
+              onKeyDown={e => { if (e.key === 'Enter' && deletePassword && !deleting) handleDeleteSubmit() }}
+            />
+            {deleteErr && (
+              <div className="text-xs text-red-600 mb-2">{deleteErr}</div>
+            )}
+            <div className="flex gap-2 justify-end mt-4">
+              <button
+                type="button"
+                onClick={() => { setDeleteOpen(false); setDeletePassword(''); setDeleteErr('') }}
+                disabled={deleting}
+                className="text-xs text-slate-600 border border-slate-200 hover:bg-slate-50 rounded-lg px-4 py-2 transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteSubmit}
+                disabled={deleting || !deletePassword}
+                className="text-xs font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg px-4 py-2 transition-colors disabled:opacity-50"
+              >
+                {deleting ? 'Deleting…' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── RIGHT PANEL: conversation ── */}
       <div className="flex-1 flex flex-col bg-slate-50">
