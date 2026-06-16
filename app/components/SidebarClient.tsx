@@ -65,6 +65,14 @@ export default function SidebarClient() {
           )}
         </Link>
 
+        <Link href="/inbox" className={navCls('/inbox')}>
+          <span className="text-base">📧</span>
+          <span>Inbox</span>
+          <span className="ml-auto text-[10px] uppercase tracking-wider text-slate-400 font-semibold">
+            mock
+          </span>
+        </Link>
+
         <Link
           href="/cases/new"
           className="mt-1.5 flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-3 py-2 text-sm font-semibold transition-colors shadow-sm"
