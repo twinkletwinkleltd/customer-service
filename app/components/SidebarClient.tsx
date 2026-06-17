@@ -68,9 +68,6 @@ export default function SidebarClient() {
         <Link href="/inbox" className={navCls('/inbox')}>
           <span className="text-base">📧</span>
           <span>Inbox</span>
-          <span className="ml-auto text-[10px] uppercase tracking-wider text-slate-400 font-semibold">
-            mock
-          </span>
         </Link>
 
         <Link
