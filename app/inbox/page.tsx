@@ -1,9 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { appPath } from '@/lib/api-path'
-import { MOCK_THREADS } from '@/lib/mock-inbox'
+import { fetchInboxFeed, type InboxFeedItem } from '@/lib/inbox-api'
 import type { ThreadStatus } from '@/lib/inbox-types'
 
 const STATUS_COLORS: Record<ThreadStatus, string> = {
@@ -22,15 +22,38 @@ function timeAgo(iso: string): string {
   return new Date(t).toISOString().slice(0, 10)
 }
 
+type LoadState =
+  | { phase: 'loading' }
+  | { phase: 'ok'; items: InboxFeedItem[]; unreadTotal: number; total: number }
+  | { phase: 'error'; error: string; message: string }
+
 export default function InboxPage() {
   const [search,     setSearch]     = useState('')
   const [statusFilt, setStatusFilt] = useState<'all' | ThreadStatus>('all')
+  const [state,      setState]      = useState<LoadState>({ phase: 'loading' })
+  const [refreshTok, setRefreshTok] = useState(0)
 
-  const threads = [...MOCK_THREADS]
-    .sort((a, b) => b.lastInboundAt.localeCompare(a.lastInboundAt))
+  useEffect(() => {
+    let alive = true
+    // We deliberately do NOT reset to `loading` here — that would
+    // wipe the rendered list on every filter change. The state
+    // simply transitions to the new payload (or `error`) when the
+    // fetch resolves. The first render starts in `loading` because
+    // useState's initial value is `loading`.
+    fetchInboxFeed({ status: statusFilt })
+      .then((r) => {
+        if (!alive) return
+        if (r.ok) {
+          setState({ phase: 'ok', items: r.items, unreadTotal: r.unreadTotal, total: r.total })
+        } else {
+          setState({ phase: 'error', error: r.error, message: r.message })
+        }
+      })
+    return () => { alive = false }
+  }, [statusFilt, refreshTok])
 
-  const filtered = threads.filter((t) => {
-    if (statusFilt !== 'all' && t.status !== statusFilt) return false
+  const allItems = state.phase === 'ok' ? state.items : []
+  const filtered = allItems.filter((t) => {
     const q = search.toLowerCase()
     return !q ||
       t.customerName.toLowerCase().includes(q) ||
@@ -40,8 +63,6 @@ export default function InboxPage() {
       (t.orderId ?? '').toLowerCase().includes(q)
   })
 
-  const unreadCount = threads.filter((t) => t.unread).length
-
   return (
     <div className="p-8 max-w-6xl mx-auto flex flex-col gap-6">
 
@@ -49,26 +70,29 @@ export default function InboxPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-bold text-slate-800">Inbox</h1>
-          {unreadCount > 0 && (
+          {state.phase === 'ok' && state.unreadTotal > 0 && (
             <span className="bg-rose-100 text-rose-700 text-xs font-bold px-2.5 py-1 rounded-full">
-              {unreadCount} unread
+              {state.unreadTotal} unread
             </span>
           )}
         </div>
-        <div className="text-xs text-slate-400">
-          Source: twinkletwinkleltd@gmail.com
-          <span className="ml-2 inline-block bg-amber-50 text-amber-700 px-2 py-0.5 rounded font-semibold">
-            MOCK DATA
-          </span>
+        <div className="text-xs text-slate-400 flex items-center gap-2">
+          <span>Source: twinkletwinkleltd@gmail.com</span>
+          <button
+            onClick={() => setRefreshTok((n) => n + 1)}
+            className="ml-1 inline-block bg-slate-100 hover:bg-slate-200 text-slate-700 px-2 py-0.5 rounded font-semibold transition-colors"
+            disabled={state.phase === 'loading'}
+            title="Reload from portal-web"
+          >
+            ↻ Refresh
+          </button>
         </div>
       </div>
 
-      {/* Phase 1 banner */}
-      <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-        <span className="font-semibold">Phase 1 scaffold:</span> the conversations
-        below are hard-coded mock data so you can review the UI. Step 2 will
-        replace this with live Gmail messages.
-      </div>
+      {/* OAuth / error banner */}
+      {state.phase === 'error' && (
+        <ErrorBanner error={state.error} message={state.message} />
+      )}
 
       {/* Filter bar */}
       <div className="flex flex-wrap gap-3 items-center">
@@ -100,15 +124,17 @@ export default function InboxPage() {
         </div>
 
         <span className="text-sm text-slate-400 ml-auto">
-          {filtered.length} of {threads.length} threads
+          {state.phase === 'ok' && `${filtered.length} of ${state.total} threads`}
         </span>
       </div>
 
-      {/* List */}
-      {filtered.length === 0 ? (
+      {/* Body */}
+      {state.phase === 'loading' ? (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 text-center text-sm text-slate-400">
-          No conversations match your filter.
+          Loading…
         </div>
+      ) : state.phase === 'error' ? null : filtered.length === 0 ? (
+        <EmptyState hasAnyItems={state.items.length > 0} />
       ) : (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden divide-y divide-slate-100">
           {filtered.map((t) => (
@@ -129,7 +155,7 @@ export default function InboxPage() {
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2 min-w-0">
                       <span className={`text-sm font-semibold truncate ${t.unread ? 'text-slate-900' : 'text-slate-700'}`}>
-                        {t.customerName}
+                        {t.customerName || '(no name)'}
                       </span>
                       <span className="text-xs text-slate-400 truncate">
                         {t.customerEmail}
@@ -174,6 +200,62 @@ export default function InboxPage() {
         </div>
       )}
 
+    </div>
+  )
+}
+
+function ErrorBanner({ error, message }: { error: string; message: string }) {
+  if (error === 'gmail_not_configured') {
+    return (
+      <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <span className="font-semibold">Gmail not configured yet.</span>{' '}
+        Set up the OAuth client + token following{' '}
+        <code className="text-xs bg-amber-100 px-1 py-0.5 rounded">
+          docs/runbooks/gmail-oauth-setup.md
+        </code>
+        {' '}— the inbox stays empty until the first poll lands.
+      </div>
+    )
+  }
+  if (error === 'forbidden') {
+    return (
+      <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+        <span className="font-semibold">Access denied.</span>{' '}
+        Ask an admin to grant the <code className="text-xs bg-rose-100 px-1 py-0.5 rounded">inquiries.view</code>{' '}
+        capability on <code className="text-xs bg-rose-100 px-1 py-0.5 rounded">/admin/users</code>.
+      </div>
+    )
+  }
+  return (
+    <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+      <span className="font-semibold">Could not load inbox.</span>{' '}
+      <span className="text-xs">{error}{message ? ` — ${message}` : ''}</span>
+    </div>
+  )
+}
+
+function EmptyState({ hasAnyItems }: { hasAnyItems: boolean }) {
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 text-center">
+      {hasAnyItems ? (
+        <p className="text-sm text-slate-400">
+          No conversations match your filter.
+        </p>
+      ) : (
+        <>
+          <p className="text-sm font-medium text-slate-700">
+            No conversations yet.
+          </p>
+          <p className="mt-2 text-xs text-slate-500 max-w-md mx-auto">
+            Either Gmail polling is not yet configured (see{' '}
+            <code className="bg-slate-100 px-1 py-0.5 rounded">
+              docs/runbooks/gmail-oauth-setup.md
+            </code>
+            ), or the inbox owner has not received any customer mail in
+            the time window we sync.
+          </p>
+        </>
+      )}
     </div>
   )
 }

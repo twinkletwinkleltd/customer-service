@@ -1,11 +1,10 @@
 'use client'
 
-import { use } from 'react'
+import { use, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { notFound } from 'next/navigation'
 import { appPath } from '@/lib/api-path'
-import { findThread } from '@/lib/mock-inbox'
-import type { InboxMessage, ThreadStatus } from '@/lib/inbox-types'
+import { fetchInboxThread } from '@/lib/inbox-api'
+import type { InboxMessage, InboxThread, ThreadStatus } from '@/lib/inbox-types'
 
 const STATUS_COLORS: Record<ThreadStatus, string> = {
   open:     'bg-amber-50 text-amber-700 border-amber-200',
@@ -19,19 +18,59 @@ function fmtTime(iso: string): string {
   return d.toISOString().slice(0, 16).replace('T', ' ')
 }
 
+type LoadState =
+  | { phase: 'loading' }
+  | { phase: 'ok'; thread: InboxThread }
+  | { phase: 'error'; error: string; message: string }
+
 interface PageProps {
   params: Promise<{ thread_id: string }>
 }
 
 export default function ThreadPage({ params }: PageProps) {
   const { thread_id } = use(params)
-  const thread = findThread(thread_id)
-  if (!thread) notFound()
+  const [state, setState] = useState<LoadState>({ phase: 'loading' })
 
+  useEffect(() => {
+    let alive = true
+    // No explicit reset to `loading` here — the initial useState value
+    // is `loading`, and this effect runs once per thread_id. Navigating
+    // between threads remounts the page component (different route),
+    // so initial state already kicks in.
+    fetchInboxThread(thread_id).then((r) => {
+      if (!alive) return
+      if (r.ok) {
+        setState({ phase: 'ok', thread: r.thread })
+      } else {
+        setState({ phase: 'error', error: r.error, message: r.message })
+      }
+    })
+    return () => { alive = false }
+  }, [thread_id])
+
+  if (state.phase === 'loading') {
+    return <Shell><div className="text-sm text-slate-400">Loading…</div></Shell>
+  }
+  if (state.phase === 'error') {
+    return (
+      <Shell>
+        <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+          <span className="font-semibold">
+            {state.error === 'not_found'
+              ? 'Conversation not found.'
+              : 'Could not load conversation.'}
+          </span>{' '}
+          <span className="text-xs">{state.message}</span>
+        </div>
+      </Shell>
+    )
+  }
+
+  const thread = state.thread
   return (
     <div className="p-8 max-w-4xl mx-auto flex flex-col gap-5">
 
-      {/* Top bar: back + status + actions */}
+      {/* Top bar */}
       <div className="flex items-center justify-between">
         <Link
           href={appPath('/inbox')}
@@ -43,21 +82,18 @@ export default function ThreadPage({ params }: PageProps) {
           <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full border ${STATUS_COLORS[thread.status]}`}>
             {thread.status}
           </span>
-          <button
-            className="text-xs text-slate-400 px-2 py-1 rounded hover:bg-slate-100 cursor-not-allowed"
-            disabled
-            title="Coming in Step 2"
-          >
-            ⋯ More
-          </button>
         </div>
       </div>
 
-      {/* Subject + customer header */}
+      {/* Subject + customer */}
       <div>
-        <h1 className="text-xl font-bold text-slate-800">{thread.subject}</h1>
+        <h1 className="text-xl font-bold text-slate-800">
+          {thread.subject || '(no subject)'}
+        </h1>
         <div className="mt-1 text-sm text-slate-500">
-          <span className="font-medium text-slate-700">{thread.customerName}</span>
+          <span className="font-medium text-slate-700">
+            {thread.customerName || '(no name)'}
+          </span>
           <span className="text-slate-400 ml-2">{thread.customerEmail}</span>
         </div>
       </div>
@@ -93,23 +129,41 @@ export default function ThreadPage({ params }: PageProps) {
         </div>
       </div>
 
-      {/* Messages — chat bubbles */}
+      {/* Messages */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm px-5 py-6 flex flex-col gap-5">
-        {thread.messages.map((m) => (
+        {thread.messages.length === 0 ? (
+          <div className="text-sm text-slate-400 text-center">
+            No messages on this thread yet.
+          </div>
+        ) : thread.messages.map((m) => (
           <MessageBubble key={m.id} message={m} />
         ))}
       </div>
 
-      {/* Phase 1 read-only footer */}
+      {/* Read-only footer */}
       <div className="rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4 text-sm text-slate-600">
         <div className="font-semibold text-slate-700 mb-1">Phase 1 read-only</div>
         <p>
-          The reply composer + &ldquo;Open in Gmail&rdquo; deep link arrive in Step 2 once
-          the real Gmail API connection is wired up. For now, conversations are
-          static mock data so the UI can be reviewed.
+          The reply composer + &ldquo;Open in Gmail&rdquo; deep link arrive
+          in a future step. For now the inbox is one-way — operator
+          reads here, replies in Gmail.
         </p>
       </div>
 
+    </div>
+  )
+}
+
+function Shell({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="p-8 max-w-4xl mx-auto flex flex-col gap-5">
+      <Link
+        href={appPath('/inbox')}
+        className="text-sm text-slate-500 hover:text-slate-800 transition-colors"
+      >
+        ← Back to Inbox
+      </Link>
+      {children}
     </div>
   )
 }
@@ -132,11 +186,6 @@ function MessageBubble({ message }: { message: InboxMessage }) {
         >
           {message.text}
         </div>
-        {message.hasAttachment && (
-          <div className={`text-[10px] text-slate-400 ${isIn ? 'pl-2' : 'pr-2'}`}>
-            📎 attachment
-          </div>
-        )}
       </div>
     </div>
   )
