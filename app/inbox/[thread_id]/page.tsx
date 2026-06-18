@@ -4,7 +4,17 @@ import { use, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { appPath } from '@/lib/api-path'
 import { fetchInboxThread } from '@/lib/inbox-api'
-import type { InboxMessage, InboxThread, ThreadStatus } from '@/lib/inbox-types'
+import type {
+  InboxMessage,
+  InboxThread,
+  ThreadChannel,
+  ThreadStatus,
+} from '@/lib/inbox-types'
+import {
+  CHANNEL_BADGE_CLASS,
+  CHANNEL_LABEL,
+  formatReason,
+} from '@/lib/category-labels'
 
 const STATUS_COLORS: Record<ThreadStatus, string> = {
   open:     'bg-amber-50 text-amber-700 border-amber-200',
@@ -33,10 +43,6 @@ export default function ThreadPage({ params }: PageProps) {
 
   useEffect(() => {
     let alive = true
-    // No explicit reset to `loading` here — the initial useState value
-    // is `loading`, and this effect runs once per thread_id. Navigating
-    // between threads remounts the page component (different route),
-    // so initial state already kicks in.
     fetchInboxThread(thread_id).then((r) => {
       if (!alive) return
       if (r.ok) {
@@ -79,6 +85,10 @@ export default function ThreadPage({ params }: PageProps) {
           ← Back to Inbox
         </Link>
         <div className="flex items-center gap-2">
+          <ChannelBadge
+            channel={thread.channel}
+            reasons={thread.categoryReasons}
+          />
           <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full border ${STATUS_COLORS[thread.status]}`}>
             {thread.status}
           </span>
@@ -128,6 +138,13 @@ export default function ThreadPage({ params }: PageProps) {
           </div>
         </div>
       </div>
+
+      {/* Classifier explanation — always-visible expansion of the
+          channel badge tooltip (Q3 explainability). */}
+      <ClassificationCard
+        channel={thread.channel}
+        reasons={thread.categoryReasons}
+      />
 
       {/* Messages */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm px-5 py-6 flex flex-col gap-5">
@@ -188,5 +205,60 @@ function MessageBubble({ message }: { message: InboxMessage }) {
         </div>
       </div>
     </div>
+  )
+}
+
+function ChannelBadge({ channel, reasons }: {
+  channel: ThreadChannel
+  reasons: string[]
+}) {
+  const cls = CHANNEL_BADGE_CLASS[channel]
+  const label = CHANNEL_LABEL[channel]
+  // Tooltip for quick hover; the full reasons list is shown below in
+  // <ClassificationCard> for keyboard / accessibility friendliness.
+  const tooltipLines = reasons.slice(0, 3).map(formatReason).filter(Boolean)
+  const tooltip = tooltipLines.length > 0
+    ? `Classified as ${label} because:\n• ${tooltipLines.join('\n• ')}`
+    : `Classified as ${label}`
+  return (
+    <span
+      className={`text-xs font-semibold px-2.5 py-0.5 rounded-full border ${cls}`}
+      title={tooltip}
+    >
+      {label}
+    </span>
+  )
+}
+
+function ClassificationCard({ channel, reasons }: {
+  channel: ThreadChannel
+  reasons: string[]
+}) {
+  const visibleReasons = reasons.map(formatReason).filter(Boolean)
+  const label = CHANNEL_LABEL[channel]
+
+  return (
+    <details
+      className="bg-white rounded-2xl border border-slate-200 shadow-sm px-5 py-3 text-sm"
+      open={false}
+    >
+      <summary className="cursor-pointer text-slate-600 hover:text-slate-800 transition-colors flex items-center gap-2 select-none">
+        <span className="text-[10px] uppercase tracking-wider font-semibold text-slate-400">
+          Why {label}?
+        </span>
+        <span className="text-xs text-slate-400">
+          {visibleReasons.length === 0
+            ? '(no classifier reasons recorded)'
+            : `${visibleReasons.length} signal${visibleReasons.length === 1 ? '' : 's'}`}
+        </span>
+      </summary>
+      {visibleReasons.length > 0 && (
+        <ul className="mt-3 flex flex-col gap-1.5 text-sm text-slate-700 list-disc pl-5">
+          {visibleReasons.map((reason, idx) => (
+            <li key={idx}>{reason}</li>
+          ))}
+        </ul>
+      )}
+    </details>
   )
 }

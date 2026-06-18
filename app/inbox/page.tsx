@@ -1,10 +1,16 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { appPath } from '@/lib/api-path'
 import { fetchInboxFeed, type InboxFeedItem } from '@/lib/inbox-api'
-import type { ThreadStatus } from '@/lib/inbox-types'
+import type { ThreadChannel, ThreadStatus } from '@/lib/inbox-types'
+import {
+  CHANNEL_BADGE_CLASS,
+  CHANNEL_LABEL,
+  channelPillActiveClass,
+  formatReason,
+} from '@/lib/category-labels'
 
 const STATUS_COLORS: Record<ThreadStatus, string> = {
   open:     'bg-amber-50 text-amber-700',
@@ -27,33 +33,48 @@ type LoadState =
   | { phase: 'ok'; items: InboxFeedItem[]; unreadTotal: number; total: number }
   | { phase: 'error'; error: string; message: string }
 
+const ALL_CHANNELS: ThreadChannel[] = ['customer', 'promotional', 'spam']
+
 export default function InboxPage() {
-  const [search,     setSearch]     = useState('')
-  const [statusFilt, setStatusFilt] = useState<'all' | ThreadStatus>('all')
-  const [state,      setState]      = useState<LoadState>({ phase: 'loading' })
-  const [refreshTok, setRefreshTok] = useState(0)
+  const [search,      setSearch]      = useState('')
+  const [statusFilt,  setStatusFilt]  = useState<'all' | ThreadStatus>('all')
+  // Phase 2a.1 — default to Customer per Q2 operator decision.
+  // Promotional / Spam are separate pills, not hidden by default.
+  const [channelFilt, setChannelFilt] = useState<'all' | ThreadChannel>('customer')
+  const [state,       setState]       = useState<LoadState>({ phase: 'loading' })
+  const [refreshTok,  setRefreshTok]  = useState(0)
 
   useEffect(() => {
     let alive = true
-    // We deliberately do NOT reset to `loading` here — that would
-    // wipe the rendered list on every filter change. The state
-    // simply transitions to the new payload (or `error`) when the
-    // fetch resolves. The first render starts in `loading` because
-    // useState's initial value is `loading`.
-    fetchInboxFeed({ status: statusFilt })
-      .then((r) => {
-        if (!alive) return
-        if (r.ok) {
-          setState({ phase: 'ok', items: r.items, unreadTotal: r.unreadTotal, total: r.total })
-        } else {
-          setState({ phase: 'error', error: r.error, message: r.message })
-        }
-      })
+    fetchInboxFeed({ status: statusFilt }).then((r) => {
+      if (!alive) return
+      if (r.ok) {
+        setState({ phase: 'ok', items: r.items, unreadTotal: r.unreadTotal, total: r.total })
+      } else {
+        setState({ phase: 'error', error: r.error, message: r.message })
+      }
+    })
     return () => { alive = false }
   }, [statusFilt, refreshTok])
 
-  const allItems = state.phase === 'ok' ? state.items : []
+  const allItems = useMemo(
+    () => (state.phase === 'ok' ? state.items : []),
+    [state],
+  )
+
+  // Per-channel counts derived from the loaded items — no extra API
+  // round-trip, no server-side aggregation. With our scale (200-500
+  // emails/month) this is negligible.
+  const channelCounts: Record<ThreadChannel, number> = useMemo(() => {
+    const counts: Record<ThreadChannel, number> = {
+      customer: 0, promotional: 0, spam: 0,
+    }
+    for (const t of allItems) counts[t.channel] = (counts[t.channel] ?? 0) + 1
+    return counts
+  }, [allItems])
+
   const filtered = allItems.filter((t) => {
+    if (channelFilt !== 'all' && t.channel !== channelFilt) return false
     const q = search.toLowerCase()
     return !q ||
       t.customerName.toLowerCase().includes(q) ||
@@ -94,38 +115,66 @@ export default function InboxPage() {
         <ErrorBanner error={state.error} message={state.message} />
       )}
 
-      {/* Filter bar */}
-      <div className="flex flex-wrap gap-3 items-center">
-        <input
-          className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white w-72 placeholder-slate-400"
-          placeholder="Search name / email / subject / order…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
+      {/* Filter bar — status + channel + search */}
+      <div className="flex flex-col gap-3">
 
-        <div className="flex bg-white border border-slate-200 rounded-lg overflow-hidden text-sm">
-          {(['all', 'open', 'resolved'] as const).map((s) => (
-            <button
-              key={s}
-              onClick={() => setStatusFilt(s)}
-              className={`px-4 py-2 text-xs font-semibold border-r last:border-r-0 border-slate-200 transition-colors ${
-                statusFilt === s
-                  ? s === 'open'
-                    ? 'bg-amber-50 text-amber-700'
-                    : s === 'resolved'
-                      ? 'bg-green-50 text-green-700'
-                      : 'bg-blue-50 text-blue-700'
-                  : 'text-slate-500 hover:bg-slate-50'
-              }`}
-            >
-              {s === 'all' ? 'All' : s.charAt(0).toUpperCase() + s.slice(1)}
-            </button>
-          ))}
+        {/* Search + status pills + total */}
+        <div className="flex flex-wrap gap-3 items-center">
+          <input
+            className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white w-72 placeholder-slate-400"
+            placeholder="Search name / email / subject / order…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+
+          <div className="flex bg-white border border-slate-200 rounded-lg overflow-hidden text-sm">
+            {(['all', 'open', 'resolved'] as const).map((s) => (
+              <button
+                key={s}
+                onClick={() => setStatusFilt(s)}
+                className={`px-4 py-2 text-xs font-semibold border-r last:border-r-0 border-slate-200 transition-colors ${
+                  statusFilt === s
+                    ? s === 'open'
+                      ? 'bg-amber-50 text-amber-700'
+                      : s === 'resolved'
+                        ? 'bg-green-50 text-green-700'
+                        : 'bg-blue-50 text-blue-700'
+                    : 'text-slate-500 hover:bg-slate-50'
+                }`}
+              >
+                {s === 'all' ? 'All status' : s.charAt(0).toUpperCase() + s.slice(1)}
+              </button>
+            ))}
+          </div>
+
+          <span className="text-sm text-slate-400 ml-auto">
+            {state.phase === 'ok' && `${filtered.length} of ${state.total} threads`}
+          </span>
         </div>
 
-        <span className="text-sm text-slate-400 ml-auto">
-          {state.phase === 'ok' && `${filtered.length} of ${state.total} threads`}
-        </span>
+        {/* Channel pills (Phase 2a.1) */}
+        <div className="flex flex-wrap gap-1.5 items-center">
+          <span className="text-[10px] uppercase tracking-wider font-semibold text-slate-400 mr-1">
+            Category
+          </span>
+          {ALL_CHANNELS.map((c) => (
+            <ChannelPill
+              key={c}
+              channel={c}
+              active={channelFilt === c}
+              count={channelCounts[c]}
+              onClick={() => setChannelFilt(c)}
+            />
+          ))}
+          <ChannelPill
+            key="all"
+            channel={'all'}
+            active={channelFilt === 'all'}
+            count={allItems.length}
+            onClick={() => setChannelFilt('all')}
+          />
+        </div>
+
       </div>
 
       {/* Body */}
@@ -134,7 +183,10 @@ export default function InboxPage() {
           Loading…
         </div>
       ) : state.phase === 'error' ? null : filtered.length === 0 ? (
-        <EmptyState hasAnyItems={state.items.length > 0} />
+        <EmptyState
+          hasAnyItems={state.items.length > 0}
+          channelFilt={channelFilt}
+        />
       ) : (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden divide-y divide-slate-100">
           {filtered.map((t) => (
@@ -167,6 +219,10 @@ export default function InboxPage() {
                           {t.orderId}
                         </span>
                       )}
+                      <ChannelBadge
+                        channel={t.channel}
+                        reasons={t.categoryReasons}
+                      />
                       <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${STATUS_COLORS[t.status]}`}>
                         {t.status}
                       </span>
@@ -204,6 +260,52 @@ export default function InboxPage() {
   )
 }
 
+function ChannelPill({ channel, active, count, onClick }: {
+  channel: ThreadChannel | 'all'
+  active: boolean
+  count: number
+  onClick: () => void
+}) {
+  const label = channel === 'all' ? 'All' : CHANNEL_LABEL[channel]
+  const activeCls = channelPillActiveClass(channel)
+  return (
+    <button
+      onClick={onClick}
+      className={`px-3 py-1 text-xs font-semibold rounded-full border transition-colors ${
+        active
+          ? `${activeCls} border-current`
+          : 'text-slate-500 bg-white border-slate-200 hover:bg-slate-50'
+      }`}
+    >
+      {label}
+      <span className={`ml-1.5 text-[10px] font-normal ${active ? 'opacity-80' : 'opacity-60'}`}>
+        {count}
+      </span>
+    </button>
+  )
+}
+
+function ChannelBadge({ channel, reasons }: {
+  channel: ThreadChannel
+  reasons: string[]
+}) {
+  const cls = CHANNEL_BADGE_CLASS[channel]
+  const label = CHANNEL_LABEL[channel]
+  // First reason becomes the tooltip — keeps the hover hint short.
+  const tooltipLines = reasons.slice(0, 3).map(formatReason).filter(Boolean)
+  const tooltip = tooltipLines.length > 0
+    ? `Classified as ${label} because:\n• ${tooltipLines.join('\n• ')}`
+    : `Classified as ${label}`
+  return (
+    <span
+      className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${cls}`}
+      title={tooltip}
+    >
+      {label}
+    </span>
+  )
+}
+
 function ErrorBanner({ error, message }: { error: string; message: string }) {
   if (error === 'gmail_not_configured') {
     return (
@@ -234,28 +336,33 @@ function ErrorBanner({ error, message }: { error: string; message: string }) {
   )
 }
 
-function EmptyState({ hasAnyItems }: { hasAnyItems: boolean }) {
+function EmptyState({ hasAnyItems, channelFilt }: {
+  hasAnyItems: boolean
+  channelFilt: 'all' | ThreadChannel
+}) {
+  if (hasAnyItems) {
+    const label = channelFilt === 'all' ? 'your filter' : `the ${CHANNEL_LABEL[channelFilt]} category`
+    return (
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 text-center">
+        <p className="text-sm text-slate-400">
+          No conversations match {label}.
+        </p>
+      </div>
+    )
+  }
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 text-center">
-      {hasAnyItems ? (
-        <p className="text-sm text-slate-400">
-          No conversations match your filter.
-        </p>
-      ) : (
-        <>
-          <p className="text-sm font-medium text-slate-700">
-            No conversations yet.
-          </p>
-          <p className="mt-2 text-xs text-slate-500 max-w-md mx-auto">
-            Either Gmail polling is not yet configured (see{' '}
-            <code className="bg-slate-100 px-1 py-0.5 rounded">
-              docs/runbooks/gmail-oauth-setup.md
-            </code>
-            ), or the inbox owner has not received any customer mail in
-            the time window we sync.
-          </p>
-        </>
-      )}
+      <p className="text-sm font-medium text-slate-700">
+        No conversations yet.
+      </p>
+      <p className="mt-2 text-xs text-slate-500 max-w-md mx-auto">
+        Either Gmail polling is not yet configured (see{' '}
+        <code className="bg-slate-100 px-1 py-0.5 rounded">
+          docs/runbooks/gmail-oauth-setup.md
+        </code>
+        ), or the inbox owner has not received any customer mail in
+        the time window we sync.
+      </p>
     </div>
   )
 }
