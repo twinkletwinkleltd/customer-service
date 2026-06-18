@@ -11,7 +11,13 @@
 // the runbook; everything else gets a generic "failed to load" bar.
 
 import { apiPath } from './api-path'
-import type { InboxMessage, InboxThread, ThreadStatus } from './inbox-types'
+import type {
+  CategoryReason,
+  InboxMessage,
+  InboxThread,
+  ThreadChannel,
+  ThreadStatus,
+} from './inbox-types'
 
 // ---------------------------------------------------------------------------
 // Wire envelopes (what the Flask backend returns)
@@ -25,6 +31,7 @@ interface WireFeedItem {
   starred: boolean
   unread: boolean
   tags: string[]
+  category_reasons?: string[] | null
   source?: string | null
   last_inbound_at: string | null
   last_inbound_preview: string | null
@@ -64,6 +71,7 @@ interface WireThreadDetail {
   status: string
   starred?: boolean
   tags?: string[]
+  category_reasons?: string[] | null
   source?: string | null
   last_inbound_at: string | null
   last_outbound_at?: string | null
@@ -89,7 +97,7 @@ export type InboxFeedItem = Pick<
   InboxThread,
   'id' | 'customerName' | 'customerEmail' | 'subject'
   | 'status' | 'unread' | 'lastInboundAt' | 'lastInboundPreview'
-  | 'orderId' | 'tags' | 'source'
+  | 'orderId' | 'tags' | 'source' | 'channel' | 'categoryReasons'
 >
 
 export type FeedResult =
@@ -117,6 +125,8 @@ function mapFeedItem(w: WireFeedItem): InboxFeedItem {
     orderId:             w.order_id ?? undefined,
     tags:                Array.isArray(w.tags) ? w.tags : [],
     source:              w.source ?? undefined,
+    channel:             normaliseChannel(w.channel),
+    categoryReasons:     Array.isArray(w.category_reasons) ? w.category_reasons : [],
   }
 }
 
@@ -143,6 +153,8 @@ function mapThreadDetail(w: WireThreadDetail): InboxThread {
     orderId:             w.order_id ?? undefined,
     tags:                Array.isArray(w.tags) ? w.tags : [],
     source:              w.source ?? undefined,
+    channel:             normaliseChannel(w.channel),
+    categoryReasons:     Array.isArray(w.category_reasons) ? w.category_reasons : [],
     messages:            Array.isArray(w.messages) ? w.messages.map(mapMessage) : [],
   }
 }
@@ -150,6 +162,18 @@ function mapThreadDetail(w: WireThreadDetail): InboxThread {
 function normaliseStatus(s: string): ThreadStatus {
   return s === 'resolved' ? 'resolved' : 'open'
 }
+
+// 2026-06-17 (Phase 2a.1) — backend writes ``customer`` / ``promotional``
+// / ``spam`` now, but pre-migration rows may still carry ``gmail`` or
+// other legacy values. Anything we don't recognise falls back to
+// ``customer`` (high-recall default — same heuristic the backend uses).
+function normaliseChannel(c: string | undefined | null): ThreadChannel {
+  if (c === 'promotional' || c === 'spam' || c === 'customer') return c
+  return 'customer'
+}
+
+// Re-export the type so consumers can import it from a single place.
+export type { ThreadChannel, CategoryReason }
 
 // ---------------------------------------------------------------------------
 // Public API

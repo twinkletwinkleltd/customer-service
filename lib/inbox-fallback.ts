@@ -30,6 +30,7 @@ interface FlaskMessage {
 interface FlaskThreadDetail {
   thread_id: string
   channel: string
+  category_reasons: string[]
   subject: string
   status: string
   starred: boolean
@@ -46,6 +47,7 @@ interface FlaskThreadDetail {
 interface FlaskFeedItem {
   thread_id: string
   channel: string
+  category_reasons: string[]
   subject: string
   status: string
   starred: boolean
@@ -59,10 +61,41 @@ interface FlaskFeedItem {
   order_id: string | null
 }
 
+// 2026-06-17 Phase 2a.1 — distribute mock threads across the 3 visible
+// channels so the dev workflow exercises the filter pills. We don't
+// want to edit mock-inbox.ts (it's the Step 1 visual reference) so we
+// derive a deterministic channel here from the thread id's char-code
+// sum: mod 5 gives ~60% customer / 20% promotional / 20% spam, which
+// is roughly the realistic distribution operators see.
+function mockChannelFor(t: InboxThread): { channel: string; reasons: string[] } {
+  let h = 0
+  for (let i = 0; i < t.id.length; i++) h += t.id.charCodeAt(i)
+  const slot = h % 5
+  if (slot === 0) {
+    return {
+      channel: 'spam',
+      reasons: ['spam:noreply-style-sender'],
+    }
+  }
+  if (slot === 1) {
+    return {
+      channel: 'promotional',
+      reasons: ['promotional:list-unsubscribe-header',
+                'promotional:esp-domain-mailchimp'],
+    }
+  }
+  return {
+    channel: 'customer',
+    reasons: ['customer:no-promotional-signal'],
+  }
+}
+
 function feedItem(t: InboxThread): FlaskFeedItem {
+  const { channel, reasons } = mockChannelFor(t)
   return {
     thread_id:           t.id,
-    channel:             'gmail',
+    channel,
+    category_reasons:    reasons,
     subject:             t.subject,
     status:              t.status,
     starred:             false,
@@ -93,9 +126,11 @@ function detailMessage(m: InboxMessage): FlaskMessage {
 }
 
 function detailThread(t: InboxThread): FlaskThreadDetail {
+  const { channel, reasons } = mockChannelFor(t)
   return {
     thread_id:        t.id,
-    channel:          'gmail',
+    channel,
+    category_reasons: reasons,
     subject:          t.subject,
     status:           t.status,
     starred:          false,

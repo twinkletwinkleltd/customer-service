@@ -57,6 +57,74 @@ describe('fetchInboxFeed', () => {
     expect(item.tags).toEqual(['refund'])
     expect(item.orderId).toBe('#1234')
     expect(res.unreadTotal).toBe(1)
+    // Phase 2a.1 — legacy 'gmail' channel value normalises to
+    // 'customer' (high-recall default). Reasons absent from the
+    // payload become an empty list.
+    expect(item.channel).toBe('customer')
+    expect(item.categoryReasons).toEqual([])
+  })
+
+  it('maps the 3-way channel + reasons round-trip', async () => {
+    mockFetch({
+      ok: true,
+      items: [
+        {
+          thread_id: 'gmail:cust', channel: 'customer', subject: 'A',
+          status: 'open', starred: false, unread: true, tags: [],
+          category_reasons: ['customer:no-promotional-signal'],
+          source: 'gmail',
+          last_inbound_at: '2026-06-15T10:00:00+00:00',
+          last_inbound_preview: '', customer_name: 'X',
+          customer_email: 'x@y.com', order_id: null,
+        },
+        {
+          thread_id: 'gmail:promo', channel: 'promotional', subject: 'B',
+          status: 'open', starred: false, unread: false, tags: [],
+          category_reasons: ['promotional:list-unsubscribe-header'],
+          source: 'gmail',
+          last_inbound_at: '2026-06-14T10:00:00+00:00',
+          last_inbound_preview: '', customer_name: 'Brand',
+          customer_email: 'b@brand.com', order_id: null,
+        },
+        {
+          thread_id: 'gmail:spam', channel: 'spam', subject: 'C',
+          status: 'open', starred: false, unread: false, tags: [],
+          category_reasons: ['spam:gmail-label'],
+          source: 'gmail',
+          last_inbound_at: '2026-06-13T10:00:00+00:00',
+          last_inbound_preview: '', customer_name: 'Spammer',
+          customer_email: 's@spam.com', order_id: null,
+        },
+      ],
+      total: 3, unread_total: 1,
+    })
+    const res = await fetchInboxFeed() as FeedResult
+    expect(res.ok).toBe(true)
+    if (!res.ok) return
+    expect(res.items[0].channel).toBe('customer')
+    expect(res.items[0].categoryReasons).toEqual(['customer:no-promotional-signal'])
+    expect(res.items[1].channel).toBe('promotional')
+    expect(res.items[1].categoryReasons).toEqual(['promotional:list-unsubscribe-header'])
+    expect(res.items[2].channel).toBe('spam')
+    expect(res.items[2].categoryReasons).toEqual(['spam:gmail-label'])
+  })
+
+  it('normalises unrecognised channel to customer (high-recall default)', async () => {
+    mockFetch({
+      ok: true,
+      items: [{
+        thread_id: 'gmail:t1', channel: 'totally-invalid-channel',
+        subject: '', status: 'open', starred: false, unread: false,
+        tags: [], source: 'gmail',
+        last_inbound_at: null, last_inbound_preview: null,
+        customer_name: null, customer_email: null, order_id: null,
+      }],
+      total: 1, unread_total: 0,
+    })
+    const res = await fetchInboxFeed() as FeedResult
+    expect(res.ok).toBe(true)
+    if (!res.ok) return
+    expect(res.items[0].channel).toBe('customer')
   })
 
   it('normalises unknown status to open', async () => {

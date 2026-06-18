@@ -21,6 +21,8 @@ export const MOCK_THREADS: InboxThread[] = [
     orderId: '#1234',
     tags: ['refund', 'size-issue'],
     source: 'gmail',
+    channel: 'customer',
+    categoryReasons: ['customer:no-promotional-signal'],
     messages: [
       {
         id: 'm-1',
@@ -57,6 +59,8 @@ export const MOCK_THREADS: InboxThread[] = [
     orderId: '#1198',
     tags: ['shipping'],
     source: 'gmail',
+    channel: 'customer',
+    categoryReasons: ['customer:no-promotional-signal'],
     messages: [
       {
         id: 'm-1',
@@ -79,6 +83,8 @@ export const MOCK_THREADS: InboxThread[] = [
     orderId: '#1162',
     tags: ['advice'],
     source: 'gmail',
+    channel: 'customer',
+    categoryReasons: ['customer:no-promotional-signal'],
     messages: [
       {
         id: 'm-1',
@@ -114,6 +120,8 @@ export const MOCK_THREADS: InboxThread[] = [
     lastInboundPreview: 'I run a small optician shop in Manchester and would like to know about bulk discounts…',
     tags: ['wholesale', 'pre-sale'],
     source: 'gmail',
+    channel: 'customer',
+    categoryReasons: ['customer:no-promotional-signal'],
     messages: [
       {
         id: 'm-1',
@@ -136,6 +144,8 @@ export const MOCK_THREADS: InboxThread[] = [
     orderId: '#1145',
     tags: ['thank-you'],
     source: 'gmail',
+    channel: 'customer',
+    categoryReasons: ['customer:no-promotional-signal'],
     messages: [
       {
         id: 'm-1',
