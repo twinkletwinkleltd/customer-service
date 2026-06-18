@@ -1,7 +1,14 @@
 // lib/inbox-api.test.ts — mapper tests (snake_case wire → camelCase UI)
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { fetchInboxFeed, fetchInboxThread, type FeedResult, type ThreadResult } from './inbox-api'
+import {
+  fetchInboxFeed,
+  fetchInboxThread,
+  markNotSpam,
+  type FeedResult,
+  type MarkNotSpamResult,
+  type ThreadResult,
+} from './inbox-api'
 
 const origFetch = global.fetch
 
@@ -288,5 +295,126 @@ describe('fetchInboxThread', () => {
     await fetchInboxThread('gmail:t1')
     const url = String(fetchSpy.mock.calls[0][0])
     expect(url).toContain('gmail%3At1')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Phase 2a.2 — markNotSpam
+// ---------------------------------------------------------------------------
+
+describe('markNotSpam', () => {
+  it('POSTs with XHR header + JSON content type', async () => {
+    const fetchSpy = vi.fn().mockResolvedValue({
+      json: async () => ({
+        ok: true,
+        thread: {
+          thread_id: 'gmail:t1', channel: 'customer', subject: 's',
+          status: 'open', starred: false, tags: [],
+          category_reasons: ['operator:rescued-from-spam'],
+          last_inbound_at: null, messages: [],
+        },
+        gmail_response: { id: 'g-tid', message_count: 2 },
+      }),
+      status: 200,
+    } as Response)
+    global.fetch = fetchSpy as unknown as typeof fetch
+
+    await markNotSpam('gmail:t1')
+    const init = fetchSpy.mock.calls[0][1] as RequestInit
+    expect(init.method).toBe('POST')
+    const headers = init.headers as Record<string, string>
+    expect(headers['x-requested-with']).toBe('XMLHttpRequest')
+    expect(headers['content-type']).toBe('application/json')
+  })
+
+  it('encodes thread_id (with colon) in the URL path', async () => {
+    const fetchSpy = vi.fn().mockResolvedValue({
+      json: async () => ({
+        ok: true,
+        thread: {
+          thread_id: 'gmail:t1', channel: 'customer', subject: 's',
+          status: 'open', starred: false, tags: [],
+          last_inbound_at: null, messages: [],
+        },
+      }),
+      status: 200,
+    } as Response)
+    global.fetch = fetchSpy as unknown as typeof fetch
+    await markNotSpam('gmail:t1')
+    const url = String(fetchSpy.mock.calls[0][0])
+    expect(url).toContain('/conversations/gmail%3At1/mark-not-spam')
+  })
+
+  it('returns ok=true + maps thread to camelCase + gmailMessageCount', async () => {
+    mockFetch({
+      ok: true,
+      thread: {
+        thread_id: 'gmail:t1', channel: 'customer', subject: 'Refund',
+        status: 'open', starred: false, tags: ['refund'],
+        category_reasons: ['spam:gmail-label', 'operator:rescued-from-spam'],
+        last_inbound_at: '2026-06-15T10:00:00+00:00',
+        customer_name: 'John', customer_email: 'john@example.com',
+        order_id: '#1234',
+        messages: [{
+          id: 1, message_text: 'hi', created_at: '2026-06-15T10:00:00+00:00',
+          sender_name: 'John', sender_email: 'john@example.com',
+          direction: 'in',
+        }],
+      },
+      gmail_response: { id: 'g-tid', message_count: 3 },
+    })
+    const res = await markNotSpam('gmail:t1') as MarkNotSpamResult
+    expect(res.ok).toBe(true)
+    if (!res.ok) return
+    expect(res.thread.channel).toBe('customer')
+    expect(res.thread.id).toBe('gmail:t1')
+    expect(res.thread.categoryReasons).toContain('operator:rescued-from-spam')
+    expect(res.gmailMessageCount).toBe(3)
+  })
+
+  it('returns error envelope on 502 gmail_modify_failed', async () => {
+    mockFetch({
+      ok: false,
+      error: 'gmail_modify_failed',
+      message: '403 Forbidden: insufficientPermissions',
+    }, 502)
+    const res = await markNotSpam('gmail:t1') as MarkNotSpamResult
+    expect(res.ok).toBe(false)
+    if (res.ok) return
+    expect(res.error).toBe('gmail_modify_failed')
+    expect(res.message).toContain('insufficientPermissions')
+  })
+
+  it('returns error envelope on 400 not_a_gmail_thread', async () => {
+    mockFetch({ ok: false, error: 'not_a_gmail_thread' }, 400)
+    const res = await markNotSpam('shopify:t1') as MarkNotSpamResult
+    expect(res.ok).toBe(false)
+    if (res.ok) return
+    expect(res.error).toBe('not_a_gmail_thread')
+  })
+
+  it('returns error envelope on 404', async () => {
+    mockFetch({ ok: false, error: 'not_found' }, 404)
+    const res = await markNotSpam('gmail:gone') as MarkNotSpamResult
+    expect(res.ok).toBe(false)
+    if (res.ok) return
+    expect(res.error).toBe('not_found')
+  })
+
+  it('returns error envelope on network failure', async () => {
+    global.fetch = vi.fn().mockRejectedValue(new Error('connection refused')) as unknown as typeof fetch
+    const res = await markNotSpam('gmail:t1') as MarkNotSpamResult
+    expect(res.ok).toBe(false)
+    if (res.ok) return
+    expect(res.error).toBe('network_error')
+    expect(res.message).toContain('connection refused')
+  })
+
+  it('treats missing thread in success response as error', async () => {
+    /* If Flask returns ok:true but no thread (shouldn't happen but
+     * be defensive), the client must not silently propagate undefined. */
+    mockFetch({ ok: true })
+    const res = await markNotSpam('gmail:t1') as MarkNotSpamResult
+    expect(res.ok).toBe(false)
   })
 })

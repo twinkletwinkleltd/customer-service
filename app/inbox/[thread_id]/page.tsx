@@ -3,7 +3,7 @@
 import { use, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { appPath } from '@/lib/api-path'
-import { fetchInboxThread } from '@/lib/inbox-api'
+import { fetchInboxThread, markNotSpam } from '@/lib/inbox-api'
 import type {
   InboxMessage,
   InboxThread,
@@ -94,6 +94,14 @@ export default function ThreadPage({ params }: PageProps) {
           </span>
         </div>
       </div>
+
+      {/* Spam rescue affordance — only on spam-tagged threads. */}
+      {thread.channel === 'spam' && (
+        <SpamRescueCard
+          thread={thread}
+          onRescued={(updated) => setState({ phase: 'ok', thread: updated })}
+        />
+      )}
 
       {/* Subject + customer */}
       <div>
@@ -261,4 +269,93 @@ function ClassificationCard({ channel, reasons }: {
       )}
     </details>
   )
+}
+
+
+// ---------------------------------------------------------------------------
+// Phase 2a.2 — Mark as not spam
+// ---------------------------------------------------------------------------
+
+type RescuePhase =
+  | { phase: 'idle' }
+  | { phase: 'submitting' }
+  | { phase: 'error'; error: string; message: string }
+
+function SpamRescueCard({ thread, onRescued }: {
+  thread: InboxThread
+  onRescued: (updated: InboxThread) => void
+}) {
+  const [rescue, setRescue] = useState<RescuePhase>({ phase: 'idle' })
+
+  async function handleClick() {
+    setRescue({ phase: 'submitting' })
+    const result = await markNotSpam(thread.id)
+    if (result.ok) {
+      onRescued(result.thread)
+      // The rescued thread re-renders with channel='customer', which
+      // un-mounts this card automatically (the parent conditionals
+      // on thread.channel === 'spam').
+    } else {
+      setRescue({
+        phase: 'error',
+        error: result.error,
+        message: result.message,
+      })
+    }
+  }
+
+  return (
+    <div className="rounded-2xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm text-rose-900">
+      <div className="flex items-start gap-3">
+        <div className="flex-1">
+          <div className="font-semibold mb-1">
+            Tagged as Spam by the classifier
+          </div>
+          <p className="text-rose-700">
+            If this is a real customer (or a partner/wholesaler) and
+            Gmail mis-routed it, click <span className="font-semibold">Mark as not spam</span>{' '}
+            below. The thread will move back to Inbox in Gmail and be
+            re-classified locally as a customer thread. The action is
+            recorded in the rescue audit log.
+          </p>
+          {rescue.phase === 'error' && (
+            <div className="mt-3 rounded-lg bg-white border border-rose-200 px-3 py-2 text-xs text-rose-700">
+              <span className="font-semibold">Could not rescue.</span>{' '}
+              {rescueErrorHint(rescue.error)}
+              <div className="mt-1 text-rose-500 break-all">{rescue.message}</div>
+            </div>
+          )}
+        </div>
+        <button
+          onClick={handleClick}
+          disabled={rescue.phase === 'submitting'}
+          className="shrink-0 bg-white border border-rose-300 text-rose-700 font-semibold rounded-lg px-4 py-2 text-sm hover:bg-rose-100 transition-colors disabled:opacity-60 disabled:cursor-wait"
+        >
+          {rescue.phase === 'submitting' ? 'Rescuing…' : '✓ Mark as not spam'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function rescueErrorHint(error: string): string {
+  switch (error) {
+    case 'gmail_not_configured':
+      return 'Gmail OAuth token is missing. See docs/runbooks/gmail-oauth-setup.md.'
+    case 'gmail_modify_failed':
+      return (
+        'Gmail refused the modify call. Most likely the token is on the '
+        + 'old gmail.readonly scope — re-run scripts/ops/gmail_oauth_setup.py '
+        + 'to refresh to gmail.modify.'
+      )
+    case 'forbidden':
+      return 'You do not have inquiries.rescue_spam capability. Ask an admin via /admin/users.'
+    case 'not_a_gmail_thread':
+      return 'Only Gmail-sourced threads can be rescued via this UI.'
+    case 'flask_unreachable':
+    case 'network_error':
+      return 'portal-web Flask backend is unreachable.'
+    default:
+      return 'Unexpected error from the rescue endpoint.'
+  }
 }

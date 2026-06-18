@@ -175,6 +175,73 @@ function normaliseChannel(c: string | undefined | null): ThreadChannel {
 // Re-export the type so consumers can import it from a single place.
 export type { ThreadChannel, CategoryReason }
 
+
+// ---------------------------------------------------------------------------
+// Phase 2a.2 — Mark not spam (rescue)
+// ---------------------------------------------------------------------------
+
+interface WireMarkNotSpamResponse {
+  ok: boolean
+  thread?: WireThreadDetail
+  error?: string
+  message?: string
+  gmail_response?: { id?: string | null; message_count?: number }
+  _meta?: Record<string, unknown>
+}
+
+export type MarkNotSpamResult =
+  | { ok: true; thread: InboxThread; gmailMessageCount: number }
+  | { ok: false; error: string; message: string }
+
+/** Rescue a spam-tagged thread: tell the backend to call Gmail
+ *  ``threads.modify`` (SPAM → INBOX) + flip the local channel to
+ *  ``customer``. Returns the updated thread on success.
+ *
+ *  Failure surfacing:
+ *    - ``error === 'gmail_not_configured'``: token blob missing.
+ *    - ``error === 'gmail_modify_failed'``: Gmail returned an error
+ *      (most commonly a 403 because the operator still has the old
+ *      ``gmail.readonly`` scope token — they need to re-run
+ *      ``scripts/ops/gmail_oauth_setup.py``).
+ *    - ``error === 'not_a_gmail_thread'``: Thread ID lacks ``gmail:``
+ *      prefix; non-Gmail threads can't be rescued via this route.
+ *    - ``error === 'forbidden'``: User lacks ``inquiries.rescue_spam``
+ *      capability. */
+export async function markNotSpam(threadId: string): Promise<MarkNotSpamResult> {
+  const url = apiPath(`/conversations/${encodeURIComponent(threadId)}/mark-not-spam`)
+  let json: WireMarkNotSpamResponse
+  try {
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'x-requested-with': 'XMLHttpRequest',
+        'content-type':     'application/json',
+      },
+      body: JSON.stringify({}),
+      cache: 'no-store',
+    })
+    json = await resp.json() as WireMarkNotSpamResponse
+  } catch (err: unknown) {
+    return {
+      ok: false,
+      error: 'network_error',
+      message: (err as Error).message,
+    }
+  }
+  if (!json.ok || !json.thread) {
+    return {
+      ok: false,
+      error: json.error ?? 'unknown',
+      message: json.message ?? '',
+    }
+  }
+  return {
+    ok: true,
+    thread: mapThreadDetail(json.thread),
+    gmailMessageCount: Number(json.gmail_response?.message_count ?? 0),
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
