@@ -1,5 +1,5 @@
 // app/api/cases/[id]/route.test.ts
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import {
   setupTmpDataRoot,
   cleanupTmpDataRoot,
@@ -9,6 +9,14 @@ import {
 import type { CustomerCase } from '@/lib/types'
 
 let tmpRoot: string
+
+vi.mock('@/lib/portalPassword', () => ({
+  verifyPortalPassword: vi.fn(async () => true),
+}))
+
+vi.mock('@/lib/auditLog', () => ({
+  logAuditEvent: vi.fn(async () => undefined),
+}))
 
 beforeEach(async () => {
   tmpRoot = await setupTmpDataRoot()
@@ -89,7 +97,14 @@ describe('DELETE /api/cases/[id]', () => {
     const { DELETE } = await import('./route')
     const { getCaseById } = await import('@/lib/cases')
 
-    const req = new Request(`http://test/api/cases/${c.id}`, { method: 'DELETE' })
+    const req = new Request(`http://test/api/cases/${c.id}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-portal-user': 'star001',
+      },
+      body: JSON.stringify({ password: 'portal-password' }),
+    })
     const res = await DELETE(req, makeCtx({ id: c.id }))
     expect(res.status).toBe(204)
     // 204 must have no body
@@ -102,7 +117,14 @@ describe('DELETE /api/cases/[id]', () => {
   // I6b: missing id → 404
   it('I6 returns 404 when deleting a missing case', async () => {
     const { DELETE } = await import('./route')
-    const req = new Request('http://test/api/cases/case-999', { method: 'DELETE' })
+    const req = new Request('http://test/api/cases/case-999', {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-portal-user': 'star001',
+      },
+      body: JSON.stringify({ password: 'portal-password' }),
+    })
     const res = await DELETE(req, makeCtx({ id: 'case-999' }))
     expect(res.status).toBe(404)
   })

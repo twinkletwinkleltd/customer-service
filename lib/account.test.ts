@@ -12,7 +12,7 @@ describe('account enum', () => {
     for (const a of ACCOUNT_VALUES) {
       expect(ACCOUNT_DISPLAY[a]).toBeTruthy()
     }
-    expect(ACCOUNT_DISPLAY.shopify).toBe('Shopify')
+    expect(ACCOUNT_DISPLAY.shopify).toBe('TKTK Shopify')
   })
 
   it('isAccount accepts all known values and rejects unknown', () => {

@@ -127,7 +127,7 @@ describe('formatReason', () => {
   it('returns empty string for null / undefined input', () => {
     // @ts-expect-error — testing runtime resilience to bad input.
     expect(formatReason(null)).toBe('')
-    // @ts-expect-error
+    // @ts-expect-error - testing runtime resilience to bad input.
     expect(formatReason(undefined)).toBe('')
     expect(formatReason('')).toBe('')
   })
