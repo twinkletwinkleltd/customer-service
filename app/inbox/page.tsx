@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { appPath } from '@/lib/api-path'
 import { fetchInboxFeed, type InboxFeedItem } from '@/lib/inbox-api'
 import type { ThreadChannel, ThreadStatus } from '@/lib/inbox-types'
 import {
@@ -192,7 +191,7 @@ export default function InboxPage() {
           {filtered.map((t) => (
             <Link
               key={t.id}
-              href={appPath(`/inbox/${t.id}`)}
+              href={`/inbox/${t.id}`}
               className="block px-5 py-4 hover:bg-slate-50 transition-colors"
             >
               <div className="flex items-start gap-3">

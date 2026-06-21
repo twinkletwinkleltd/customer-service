@@ -2,7 +2,6 @@
 
 import { use, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { appPath } from '@/lib/api-path'
 import { fetchInboxThread, markNotSpam } from '@/lib/inbox-api'
 import type {
   InboxMessage,
@@ -79,7 +78,7 @@ export default function ThreadPage({ params }: PageProps) {
       {/* Top bar */}
       <div className="flex items-center justify-between">
         <Link
-          href={appPath('/inbox')}
+          href="/inbox"
           className="text-sm text-slate-500 hover:text-slate-800 transition-colors"
         >
           ← Back to Inbox
@@ -183,7 +182,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   return (
     <div className="p-8 max-w-4xl mx-auto flex flex-col gap-5">
       <Link
-        href={appPath('/inbox')}
+        href="/inbox"
         className="text-sm text-slate-500 hover:text-slate-800 transition-colors"
       >
         ← Back to Inbox
