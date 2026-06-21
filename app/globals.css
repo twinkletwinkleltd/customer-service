@@ -12,12 +12,16 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+/* NOTE: the create-next-app template's prefers-color-scheme:dark block
+ * was removed on 2026-06-22. The UI is designed for white card on
+ * light-grey body (bg-slate-50 from layout.tsx); enabling dark mode
+ * via the media query painted the body #0a0a0a and overrode the
+ * Tailwind utility, producing the "black background" bug operators
+ * saw at /customer-service/inbox in their dark-mode browsers. We do
+ * not have a real dark theme — text colours, borders, badges are all
+ * tuned for light mode — so the right fix is to NOT pretend to
+ * support dark mode. Re-add this block only when the whole component
+ * tree has been audited for dark-mode colour contrast. */
 
 body {
   background: var(--background);
