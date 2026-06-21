@@ -45,7 +45,11 @@ export default function InboxPage() {
 
   useEffect(() => {
     let alive = true
-    fetchInboxFeed({ status: statusFilt }).then((r) => {
+    // Flask default limit is 50 (max 200). At 2026-06 the operator
+    // has ~66 threads in DB, so the default truncates 16 threads + makes
+    // client-side channel counts misleading. Bump to the Flask cap.
+    // When DB grows >200 we'll need real pagination — for now this works.
+    fetchInboxFeed({ status: statusFilt, limit: 200 }).then((r) => {
       if (!alive) return
       if (r.ok) {
         setState({ phase: 'ok', items: r.items, unreadTotal: r.unreadTotal, total: r.total })
