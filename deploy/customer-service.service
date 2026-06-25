@@ -10,6 +10,14 @@ Environment=NODE_ENV=production
 Environment=PORTAL_SYSTEM_ROOT=/opt/portal-system
 Environment=PORTAL_DATA_ROOT=/opt/portal-system/data_lake
 Environment=PYTHON_BIN=/opt/portal-system/venv/bin/python3
+# Phase 2c / 2026-06-20: Next.js inbox proxy routes
+# (app/api/conversations/*) read this env var to forward requests
+# to the portal-system Flask backend. If unset, the proxy short-
+# circuits to lib/inbox-fallback.ts mock data — that's the dev-mode
+# convenience but in production it must point at the real Flask URL,
+# otherwise the operator sees John Doe / Mary Smith mock threads
+# instead of real Gmail-polled inbox content.
+Environment=PORTAL_FLASK_URL=https://ordercleaner.twinkletwinkle.uk
 ExecStart=/usr/bin/npm run start -- --hostname 127.0.0.1 --port 3001
 Restart=always
 RestartSec=5
