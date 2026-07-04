@@ -31,7 +31,7 @@ flowchart LR
 ```mermaid
 flowchart TB
     subgraph CS[Customer Service Next.js app]
-        MW[middleware.ts<br/>SSO allowlist check]
+        MW[proxy.ts<br/>SSO allowlist check]
         Pages[App Router pages<br/>app/page.tsx, app/cases/..., app/search/...]
         API[API route handlers<br/>app/api/cases, /cases/id,<br/>/attachments, /replies, /search, /me]
         Lib[lib/ modules]
@@ -108,7 +108,7 @@ flowchart TB
 sequenceDiagram
     participant Browser
     participant Nginx
-    participant MW as middleware.ts
+    participant MW as proxy.ts
     participant API as route.ts POST
     participant Cases as lib/cases.createCase
     participant Pers as lib/persistence
@@ -133,7 +133,7 @@ sequenceDiagram
     API-->>Browser: 201 + new case JSON
 ```
 
-Unauthorised variant: if `X-Portal-User` is missing or not in the allowlist, `middleware.ts` short-circuits with `401 JSON` for `/api/*` and `302 → /login?next=...` for page routes — request never reaches the API handler.
+Unauthorised variant: if `X-Portal-User` is missing or not in the allowlist, `proxy.ts` short-circuits with `401 JSON` for `/api/*` and `302 → /login?next=...` for page routes — request never reaches the API handler.
 
 ## Data Model
 

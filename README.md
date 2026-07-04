@@ -5,7 +5,7 @@ Lives under `ordercleaner.twinkletwinkle.uk/customer-service/`, mounted as a
 standalone Next.js 16.2 app on port `3001` behind the portal's nginx.
 
 Users: the four portal users (`star000..star003`). Anyone else is blocked at
-the middleware layer (see `middleware.ts` + ADR-002).
+the proxy layer (see `proxy.ts` + ADR-002).
 
 ## Quick start
 

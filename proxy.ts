@@ -26,7 +26,7 @@ function isAllowedUser(username: string): boolean {
   return ALLOWED_USERS_FALLBACK.includes(username);
 }
 
-export function middleware(req: NextRequest) {
+export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   // Bypass: Next internals + static assets
