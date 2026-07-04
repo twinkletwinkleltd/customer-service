@@ -283,7 +283,7 @@ describe('fetchInboxThread', () => {
     expect(res.thread.messages[0].senderLabel).toBe('(unknown)')
   })
 
-  it('encodes the thread_id properly (with colon)', async () => {
+  it('encodes the thread_id properly (with colon and slash)', async () => {
     const fetchSpy = vi.fn().mockResolvedValue({
       json: async () => ({ ok: true, thread: {
         thread_id: 'gmail:t1', channel: 'gmail', subject: '', status: 'open',
@@ -292,9 +292,24 @@ describe('fetchInboxThread', () => {
       status: 200,
     } as Response)
     global.fetch = fetchSpy as unknown as typeof fetch
-    await fetchInboxThread('gmail:t1')
+    await fetchInboxThread('gmail:t1/part2')
+    const url = String(fetchSpy.mock.calls[0][0])
+    expect(url).toContain('gmail%3At1%2Fpart2')
+  })
+
+  it('does not double-encode an already encoded thread_id', async () => {
+    const fetchSpy = vi.fn().mockResolvedValue({
+      json: async () => ({ ok: true, thread: {
+        thread_id: 'gmail:t1', channel: 'gmail', subject: '', status: 'open',
+        tags: [], last_inbound_at: null, messages: [],
+      } }),
+      status: 200,
+    } as Response)
+    global.fetch = fetchSpy as unknown as typeof fetch
+    await fetchInboxThread('gmail%3At1')
     const url = String(fetchSpy.mock.calls[0][0])
     expect(url).toContain('gmail%3At1')
+    expect(url).not.toContain('gmail%253At1')
   })
 })
 
@@ -327,7 +342,7 @@ describe('markNotSpam', () => {
     expect(headers['content-type']).toBe('application/json')
   })
 
-  it('encodes thread_id (with colon) in the URL path', async () => {
+  it('encodes thread_id (with colon and slash) in the URL path', async () => {
     const fetchSpy = vi.fn().mockResolvedValue({
       json: async () => ({
         ok: true,
@@ -340,9 +355,28 @@ describe('markNotSpam', () => {
       status: 200,
     } as Response)
     global.fetch = fetchSpy as unknown as typeof fetch
-    await markNotSpam('gmail:t1')
+    await markNotSpam('gmail:t1/part2')
+    const url = String(fetchSpy.mock.calls[0][0])
+    expect(url).toContain('/conversations/gmail%3At1%2Fpart2/mark-not-spam')
+  })
+
+  it('does not double-encode an already encoded thread_id for rescue', async () => {
+    const fetchSpy = vi.fn().mockResolvedValue({
+      json: async () => ({
+        ok: true,
+        thread: {
+          thread_id: 'gmail:t1', channel: 'customer', subject: 's',
+          status: 'open', starred: false, tags: [],
+          last_inbound_at: null, messages: [],
+        },
+      }),
+      status: 200,
+    } as Response)
+    global.fetch = fetchSpy as unknown as typeof fetch
+    await markNotSpam('gmail%3At1')
     const url = String(fetchSpy.mock.calls[0][0])
     expect(url).toContain('/conversations/gmail%3At1/mark-not-spam')
+    expect(url).not.toContain('gmail%253At1')
   })
 
   it('returns ok=true + maps thread to camelCase + gmailMessageCount', async () => {

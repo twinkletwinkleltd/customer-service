@@ -172,6 +172,14 @@ function normaliseChannel(c: string | undefined | null): ThreadChannel {
   return 'customer'
 }
 
+function decodeThreadId(threadId: string): string {
+  try {
+    return decodeURIComponent(threadId)
+  } catch {
+    return threadId
+  }
+}
+
 // Re-export the type so consumers can import it from a single place.
 export type { ThreadChannel, CategoryReason }
 
@@ -208,7 +216,7 @@ export type MarkNotSpamResult =
  *    - ``error === 'forbidden'``: User lacks ``inquiries.rescue_spam``
  *      capability. */
 export async function markNotSpam(threadId: string): Promise<MarkNotSpamResult> {
-  const url = apiPath(`/conversations/${encodeURIComponent(threadId)}/mark-not-spam`)
+  const url = apiPath(`/conversations/${encodeURIComponent(decodeThreadId(threadId))}/mark-not-spam`)
   let json: WireMarkNotSpamResponse
   try {
     const resp = await fetch(url, {
@@ -288,7 +296,7 @@ export async function fetchInboxFeed(params?: {
 }
 
 export async function fetchInboxThread(threadId: string): Promise<ThreadResult> {
-  const url = apiPath(`/conversations/${encodeURIComponent(threadId)}`)
+  const url = apiPath(`/conversations/${encodeURIComponent(decodeThreadId(threadId))}`)
   let json: WireDetailResponse
   try {
     const resp = await fetch(url, {
@@ -319,7 +327,7 @@ export async function patchThreadStatus(threadId: string, patch: {
   tags?: string[]
   assignee?: string | null
 }): Promise<ThreadResult> {
-  const url = apiPath(`/conversations/${encodeURIComponent(threadId)}`)
+  const url = apiPath(`/conversations/${encodeURIComponent(decodeThreadId(threadId))}`)
   let json: WireDetailResponse
   try {
     const resp = await fetch(url, {

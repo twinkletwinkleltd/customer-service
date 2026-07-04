@@ -16,7 +16,8 @@ import type { NextRequest } from 'next/server'
 type Ctx = { params: Promise<{ thread_id: string }> }
 
 export async function POST(request: NextRequest, ctx: Ctx) {
-  const { thread_id } = await ctx.params
+  const { thread_id: rawThreadId } = await ctx.params
+  const thread_id = decodeThreadId(rawThreadId)
   const flaskBase = process.env.PORTAL_FLASK_URL?.replace(/\/+$/, '') ?? ''
 
   // Dev / unconfigured: pretend the rescue succeeded so the UI button
@@ -78,5 +79,13 @@ function forwardedHeaders(request: NextRequest): HeadersInit {
     'x-requested-with': 'XMLHttpRequest',
     'content-type': 'application/json',
     accept: 'application/json',
+  }
+}
+
+function decodeThreadId(threadId: string): string {
+  try {
+    return decodeURIComponent(threadId)
+  } catch {
+    return threadId
   }
 }

@@ -15,7 +15,8 @@ import { MOCK_THREAD_FALLBACK } from '@/lib/inbox-fallback'
 type Ctx = { params: Promise<{ thread_id: string }> }
 
 export async function GET(request: NextRequest, ctx: Ctx) {
-  const { thread_id } = await ctx.params
+  const { thread_id: rawThreadId } = await ctx.params
+  const thread_id = decodeThreadId(rawThreadId)
   const flaskBase = process.env.PORTAL_FLASK_URL?.replace(/\/+$/, '') ?? ''
 
   if (!flaskBase) {
@@ -51,7 +52,8 @@ export async function GET(request: NextRequest, ctx: Ctx) {
 }
 
 export async function PATCH(request: NextRequest, ctx: Ctx) {
-  const { thread_id } = await ctx.params
+  const { thread_id: rawThreadId } = await ctx.params
+  const thread_id = decodeThreadId(rawThreadId)
   const flaskBase = process.env.PORTAL_FLASK_URL?.replace(/\/+$/, '') ?? ''
 
   // Dev/no-flask: pretend the mutation succeeded.
@@ -105,5 +107,13 @@ function forwardedHeaders(request: NextRequest): HeadersInit {
     'x-portal-user': xPortalUser,
     'x-requested-with': 'XMLHttpRequest',
     accept: 'application/json',
+  }
+}
+
+function decodeThreadId(threadId: string): string {
+  try {
+    return decodeURIComponent(threadId)
+  } catch {
+    return threadId
   }
 }

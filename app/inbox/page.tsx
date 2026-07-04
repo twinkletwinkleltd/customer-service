@@ -191,7 +191,7 @@ export default function InboxPage() {
           {filtered.map((t) => (
             <Link
               key={t.id}
-              href={`/inbox/${t.id}`}
+              href={`/inbox/${encodeURIComponent(t.id)}`}
               className="block px-5 py-4 hover:bg-slate-50 transition-colors"
             >
               <div className="flex items-start gap-3">
