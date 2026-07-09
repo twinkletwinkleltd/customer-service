@@ -33,10 +33,17 @@ type LoadState =
   | { phase: 'error'; error: string; message: string }
 
 const ALL_CHANNELS: ThreadChannel[] = ['customer', 'promotional', 'spam']
+const MAILBOXES = [
+  { value: 'all', label: 'All inboxes' },
+  { value: 'gmail', label: 'Gmail' },
+  { value: 'namesco', label: 'names.co.uk' },
+] as const
+type MailboxSource = typeof MAILBOXES[number]['value']
 
 export default function InboxPage() {
   const [search,      setSearch]      = useState('')
   const [statusFilt,  setStatusFilt]  = useState<'all' | ThreadStatus>('all')
+  const [sourceFilt,  setSourceFilt]  = useState<MailboxSource>('all')
   // Phase 2a.1 — default to Customer per Q2 operator decision.
   // Promotional / Spam are separate pills, not hidden by default.
   const [channelFilt, setChannelFilt] = useState<'all' | ThreadChannel>('customer')
@@ -45,7 +52,10 @@ export default function InboxPage() {
 
   useEffect(() => {
     let alive = true
-    fetchInboxFeed({ status: statusFilt }).then((r) => {
+    fetchInboxFeed({
+      status: statusFilt,
+      source: sourceFilt === 'all' ? undefined : sourceFilt,
+    }).then((r) => {
       if (!alive) return
       if (r.ok) {
         setState({ phase: 'ok', items: r.items, unreadTotal: r.unreadTotal, total: r.total })
@@ -54,7 +64,7 @@ export default function InboxPage() {
       }
     })
     return () => { alive = false }
-  }, [statusFilt, refreshTok])
+  }, [statusFilt, sourceFilt, refreshTok])
 
   const allItems = useMemo(
     () => (state.phase === 'ok' ? state.items : []),
@@ -69,6 +79,19 @@ export default function InboxPage() {
       customer: 0, promotional: 0, spam: 0,
     }
     for (const t of allItems) counts[t.channel] = (counts[t.channel] ?? 0) + 1
+    return counts
+  }, [allItems])
+
+  const sourceCounts: Record<MailboxSource, number> = useMemo(() => {
+    const counts: Record<MailboxSource, number> = {
+      all: allItems.length,
+      gmail: 0,
+      namesco: 0,
+    }
+    for (const t of allItems) {
+      if (t.source === 'namesco') counts.namesco += 1
+      else if (t.source === 'gmail') counts.gmail += 1
+    }
     return counts
   }, [allItems])
 
@@ -97,7 +120,7 @@ export default function InboxPage() {
           )}
         </div>
         <div className="text-xs text-slate-400 flex items-center gap-2">
-          <span>Source: twinkletwinkleltd@gmail.com</span>
+          <span>{mailboxLabel(sourceFilt)}</span>
           <button
             onClick={() => setRefreshTok((n) => n + 1)}
             className="ml-1 inline-block bg-slate-100 hover:bg-slate-200 text-slate-700 px-2 py-0.5 rounded font-semibold transition-colors"
@@ -152,6 +175,21 @@ export default function InboxPage() {
         </div>
 
         {/* Channel pills (Phase 2a.1) */}
+        <div className="flex flex-wrap gap-1.5 items-center">
+          <span className="text-[10px] uppercase tracking-wider font-semibold text-slate-400 mr-1">
+            Mailbox
+          </span>
+          {MAILBOXES.map((m) => (
+            <SourcePill
+              key={m.value}
+              label={m.label}
+              active={sourceFilt === m.value}
+              count={sourceCounts[m.value]}
+              onClick={() => setSourceFilt(m.value)}
+            />
+          ))}
+        </div>
+
         <div className="flex flex-wrap gap-1.5 items-center">
           <span className="text-[10px] uppercase tracking-wider font-semibold text-slate-400 mr-1">
             Category
@@ -256,6 +294,37 @@ export default function InboxPage() {
       )}
 
     </div>
+  )
+}
+
+function mailboxLabel(source: MailboxSource): string {
+  switch (source) {
+    case 'gmail': return 'Mailbox: twinkletwinkleltd@gmail.com'
+    case 'namesco': return 'Mailbox: info@twinkletwinkle.uk'
+    case 'all': return 'Mailbox: all inboxes'
+  }
+}
+
+function SourcePill({ label, active, count, onClick }: {
+  label: string
+  active: boolean
+  count: number
+  onClick: () => void
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`px-3 py-1 text-xs font-semibold rounded-full border transition-colors ${
+        active
+          ? 'bg-slate-100 text-slate-800 border-slate-400'
+          : 'text-slate-500 bg-white border-slate-200 hover:bg-slate-50'
+      }`}
+    >
+      {label}
+      <span className={`ml-1.5 text-[10px] font-normal ${active ? 'opacity-80' : 'opacity-60'}`}>
+        {count}
+      </span>
+    </button>
   )
 }
 

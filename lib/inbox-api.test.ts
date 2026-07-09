@@ -169,16 +169,22 @@ describe('fetchInboxFeed', () => {
     expect(res.message).toContain('connection refused')
   })
 
-  it('passes status + channel + limit query params', async () => {
+  it('passes status + channel + source + limit query params', async () => {
     const fetchSpy = vi.fn().mockResolvedValue({
       json: async () => ({ ok: true, items: [], total: 0, unread_total: 0 }),
       status: 200,
     } as Response)
     global.fetch = fetchSpy as unknown as typeof fetch
-    await fetchInboxFeed({ status: 'open', channel: 'gmail', limit: 25 })
+    await fetchInboxFeed({
+      status: 'open',
+      channel: 'customer',
+      source: 'namesco',
+      limit: 25,
+    })
     const url = String(fetchSpy.mock.calls[0][0])
     expect(url).toContain('status=open')
-    expect(url).toContain('channel=gmail')
+    expect(url).toContain('channel=customer')
+    expect(url).toContain('source=namesco')
     expect(url).toContain('limit=25')
   })
 

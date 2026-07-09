@@ -257,11 +257,13 @@ export async function markNotSpam(threadId: string): Promise<MarkNotSpamResult> 
 export async function fetchInboxFeed(params?: {
   status?: 'all' | ThreadStatus
   channel?: string
+  source?: string
   limit?: number
 }): Promise<FeedResult> {
   const search = new URLSearchParams()
   if (params?.status)  search.set('status',  params.status)
   if (params?.channel) search.set('channel', params.channel)
+  if (params?.source)  search.set('source',  params.source)
   if (params?.limit)   search.set('limit',   String(params.limit))
   const qs = search.toString()
   const url = apiPath('/conversations/feed') + (qs ? `?${qs}` : '')

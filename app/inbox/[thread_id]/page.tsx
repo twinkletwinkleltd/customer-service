@@ -141,7 +141,7 @@ export default function ThreadPage({ params }: PageProps) {
         <div>
           <div className="text-[10px] uppercase tracking-wider font-semibold text-slate-400">Source</div>
           <div className="mt-1 text-slate-700">
-            {thread.source ?? 'gmail'} · twinkletwinkleltd@gmail.com
+            {sourceLabel(thread.source)}
           </div>
         </div>
       </div>
@@ -168,14 +168,23 @@ export default function ThreadPage({ params }: PageProps) {
       <div className="rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4 text-sm text-slate-600">
         <div className="font-semibold text-slate-700 mb-1">Phase 1 read-only</div>
         <p>
-          The reply composer + &ldquo;Open in Gmail&rdquo; deep link arrive
-          in a future step. For now the inbox is one-way — operator
-          reads here, replies in Gmail.
+          The reply composer arrives in a future step. For now the inbox
+          is one-way — operator reads here, replies in the source mailbox.
         </p>
       </div>
 
     </div>
   )
+}
+
+function sourceLabel(source: string | undefined): string {
+  switch (source) {
+    case 'namesco':
+      return 'names.co.uk · info@twinkletwinkle.uk'
+    case 'gmail':
+    default:
+      return 'Gmail · twinkletwinkleltd@gmail.com'
+  }
 }
 
 function Shell({ children }: { children: React.ReactNode }) {
