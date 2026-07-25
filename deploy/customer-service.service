@@ -5,6 +5,7 @@ After=network.target
 [Service]
 User=portal-system
 Group=portal-system
+UMask=0077
 WorkingDirectory=/opt/customer-service
 Environment=NODE_ENV=production
 Environment=PORTAL_SYSTEM_ROOT=/opt/portal-system
