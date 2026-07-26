@@ -165,7 +165,7 @@ Passive SSO. There is no session store, no password, no JWT inside CS.
    ```nginx
    proxy_set_header X-Portal-User $cookie_portal_user;
    ```
-3. `middleware.ts` reads `x-portal-user`, checks against the hard-coded allowlist `['star000', 'star001', 'star002', 'star003']`.
+3. `proxy.ts` reads `x-portal-user`, checks against the hard-coded allowlist `['star000', 'star001', 'star002', 'star003']`.
    - API routes (`/api/*`) → `401` JSON on miss.
    - Page routes → `302 /login?next=<original>` on miss.
 4. Static assets (`/_next/*`, favicons, images) bypass the check.

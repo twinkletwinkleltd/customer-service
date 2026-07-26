@@ -9,7 +9,7 @@ CS is one sibling app among several (portal Flask, ama-listing-creator, customer
 
 ## Decision
 
-CS does not own authentication. The portal Flask app owns login. Nginx forwards the portal's `portal_user` cookie value as an `X-Portal-User` request header. `middleware.ts` reads the header, checks it against a hard-coded allowlist (`star000..star003`), and either passes the request through or returns 401 (API) / 302 → `/login` (page).
+CS does not own authentication. The portal Flask app owns login. Nginx forwards the portal's `portal_user` cookie value as an `X-Portal-User` request header. `proxy.ts` reads the header, checks it against a hard-coded allowlist (`star000..star003`), and either passes the request through or returns 401 (API) / 302 → `/login` (page).
 
 There is no session table, no JWT, no token refresh. CS trusts nginx. Nginx trusts the portal cookie.
 
@@ -23,7 +23,7 @@ There is no session table, no JWT, no token refresh. CS trusts nginx. Nginx trus
 
 **Negative:**
 - If nginx is misconfigured and forwards X-Portal-User unauthenticated from the public internet, CS is fully open. Nginx config is the security boundary — must be audited any time the reverse-proxy block is edited.
-- Allowlist is hard-coded in `middleware.ts` — adding a user means a code change + deploy, not a config flip. Fine at 4 users; untenable past ~10.
+- Allowlist is hard-coded in `proxy.ts` — adding a user means a code change + deploy, not a config flip. Fine at 4 users; untenable past ~10.
 - No fine-grained permissions. Every allowed user is effectively admin.
 
 ## Alternatives considered
