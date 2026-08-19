@@ -248,5 +248,5 @@ Every write path — `createCase`, `patchCase`, `deleteCase`, `addAttachment`, `
 | Auth lib | None — passive `X-Portal-User` header | See ADR-002. |
 | Lockfile lib | None — in-process mutex | See ADR-003. Single Node process. |
 | Styling | Tailwind v4 | Matches `ama-listing-creator`. |
-| File parsing | `xlsx` (only used in list-export features, not API-critical) | Single dependency carries the export feature. |
+| File parsing | `@e965/xlsx` (only used in list-export features, not API-critical) | Maintained SheetJS-API-compatible fork; upstream `xlsx` on npm stopped receiving security patches (2026-08-19). |
 | Testing | None in-tree today | Manual smoke testing via portal UI; any refactor of `persistence.ts` or `search.ts` should add unit tests before merging. |
